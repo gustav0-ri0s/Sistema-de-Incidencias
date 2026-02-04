@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🏫 Sistema de Gestión de Incidencias Educativas
 
-# Run and deploy your AI Studio app
+> Una solución moderna, ágil y profesional para el seguimiento de la convivencia escolar y el mantenimiento institucional.
 
-This contains everything you need to run your app locally.
+Este sistema ha sido diseñado para transformar la manera en que las instituciones educativas registran y gestionan los eventos diarios, desde conductas de estudiantes hasta incidencias de infraestructura, proporcionando datos accionables y reportes formales en tiempo real.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1YdKrdQYvVEuZRZs-h_2jQKvFn4S2rqcG
+---
 
-## Run Locally
+## ✨ Características Principales
 
-**Prerequisites:**  Node.js
+*   **🎯 Registro Inteligente**: Formulario dinámico que adapta sus campos según el tipo de incidencia (Estudiante, Aula o Infraestructura/General).
+*   **📊 Panel de Gestión en Tiempo Real**: Visualización clara del estado de cada incidencia (Registrada, Leída, En Atención, Resuelta).
+*   **📅 Centro de Reportes Avanzado**: Generación de reportes PDF profesionales con filtros inteligentes por fecha, grado, sección, alumno o estado.
+*   **👤 Gestión de Usuarios**: Control total sobre roles (Administrador, Supervisor, Docente) y gestión de perfiles.
+*   **📱 Diseño Premium & Responsivo**: Interfaz fluida, moderna y optimizada para su uso tanto en computadoras como en dispositivos móviles.
+*   **📍 Ubicación Precisa**: Seguimiento detallado de incidencias generales mediante el sistema de "Ubicación" para áreas comunes del colegio.
 
+---
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Tecnologías de Vanguardia
+
+Para garantizar la rapidez, seguridad y escalabilidad, este proyecto utiliza el "Stack" tecnológico más moderno del mercado:
+
+*   **[React](https://reactjs.org/) & [Vite](https://vitejs.dev/)**: Para una interfaz de usuario ultrarrápida y reactiva.
+*   **[TypeScript](https://www.typescriptlang.org/)**: Garantizando un código robusto y libre de errores.
+*   **[Supabase](https://supabase.com/)**: Potente infraestructura para la base de datos Postgres y autenticación en tiempo real.
+*   **[Tailwind CSS](https://tailwindcss.com/)**: Diseño estético, limpio y totalmente personalizado.
+*   **[Lucide React](https://lucide.dev/)**: Iconografía moderna y minimalista.
+*   **[jsPDF](https://parall.ax/products/jspdf)**: Motor de generación de reportes PDF de alta calidad.
+
+---
+
+## 🚀 Despliegue Rápido
+
+El proyecto está configurado para un despliegue "Zero Config" en plataformas como **Vercel** o **Netlify**. Solo requiere configurar las variables de entorno de Supabase (`VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`).
+
+---
+
+## 👨‍💻 Autor
+
+Este sistema ha sido conceptualizado y desarrollado con un enfoque en la excelencia educativa y la eficiencia administrativa.
+
+**Ing. Gustavo Rios Quevedo**  
+*Soluciones Tecnológicas de Alto Impacto*
+
+---
+
+© 2026 Sistema de Gestión de Incidencias. Todos los derechos reservados.
