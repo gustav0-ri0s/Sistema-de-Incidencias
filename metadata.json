@@ -1,0 +1,5 @@
+{
+  "name": "Sistema de Incidencias Escolares",
+  "description": "Sistema integral para el registro y seguimiento de incidencias internas en instituciones educativas, con gestión de roles, reportes PDF y auditoría.",
+  "requestFramePermissions": []
+}
