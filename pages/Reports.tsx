@@ -69,13 +69,24 @@ const Reports: React.FC = () => {
     try {
       let query = supabase
         .from('incidents')
-        .select('*, profiles:teacher_id(full_name), incident_categories:category_id(name)')
+        .select(`
+          *,
+          profiles:teacher_id(full_name),
+          incident_categories:category_id(name),
+          classrooms:classroom_id(level, grade, section),
+          incident_participants(students(names, last_names))
+        `)
         .order('created_at', { ascending: false });
 
       if (activeReport === 'classroom') {
-        query = query.eq('level', level);
-        if (grade) query = query.ilike('grade', `%${grade}%`);
-        if (section) query = query.ilike('section', `%${section}%`);
+        const selectedClass = classrooms.find(c => c.level === level && (grade ? c.grade === grade : true) && (section ? c.section === section : true));
+        if (selectedClass && grade && section) {
+          query = query.eq('classroom_id', selectedClass.id);
+        } else {
+          query = query.eq('level', level);
+          if (grade) query = query.ilike('grade', `%${grade}%`);
+          if (section) query = query.ilike('section', `%${section}%`);
+        }
       } else if (activeReport === 'status') {
         query = query.eq('status', selectedStatus);
       } else if (activeReport === 'category' && selectedCategoryId !== 'all') {
@@ -109,6 +120,9 @@ const Reports: React.FC = () => {
 
       if (activeReport === 'student' && studentSearch) {
         results = results.filter(inc =>
+          inc.incident_participants?.some((p: any) =>
+            `${p.students?.names} ${p.students?.last_names}`.toLowerCase().includes(studentSearch.toLowerCase())
+          ) ||
           inc.involved_students?.some((s: any) =>
             `${s.names} ${s.lastNames}`.toLowerCase().includes(studentSearch.toLowerCase())
           )
@@ -179,7 +193,9 @@ const Reports: React.FC = () => {
         body: previewData.map(inc => [
           inc.correlative,
           new Date(inc.incident_date).toLocaleDateString(),
-          inc.involved_students?.map((s: any) => `${s.names} ${s.lastNames}`).join(', ') || 'N/A',
+          inc.incident_participants?.length > 0
+            ? inc.incident_participants.map((p: any) => `${p.students?.names} ${p.students?.last_names}`).join(', ')
+            : inc.involved_students?.map((s: any) => `${s.names} ${s.lastNames}`).join(', ') || 'N/A',
           inc.incident_categories?.name || inc.other_category_suggestion || 'Otro',
           inc.status.toUpperCase()
         ]),
@@ -424,12 +440,21 @@ const Reports: React.FC = () => {
                       <td className="px-6 py-5 font-bold text-gray-700 text-sm">{new Date(inc.incident_date).toLocaleDateString()}</td>
                       <td className="px-6 py-5">
                         <div className="space-y-1">
-                          {inc.involved_students?.map((s: any, i: number) => (
-                            <div key={i} className="text-sm font-black text-gray-800 flex items-center gap-2">
-                              <UserCheck className="w-3 h-3 text-gray-400" />
-                              {s.names} {s.lastNames}
-                            </div>
-                          )) || <span className="text-gray-400 italic text-xs">N/A</span>}
+                          {inc.incident_participants && inc.incident_participants.length > 0 ? (
+                            inc.incident_participants.map((p: any, i: number) => (
+                              <div key={i} className="text-sm font-black text-gray-800 flex items-center gap-2">
+                                <UserCheck className="w-3 h-3 text-gray-400" />
+                                {p.students?.names} {p.students?.last_names}
+                              </div>
+                            ))
+                          ) : inc.involved_students && inc.involved_students.length > 0 ? (
+                            inc.involved_students.map((s: any, i: number) => (
+                              <div key={i} className="text-sm font-black text-gray-800 flex items-center gap-2">
+                                <UserCheck className="w-3 h-3 text-gray-400" />
+                                {s.names} {s.lastNames}
+                              </div>
+                            ))
+                          ) : <span className="text-gray-400 italic text-xs">N/A</span>}
                         </div>
                       </td>
                       <td className="px-6 py-5">

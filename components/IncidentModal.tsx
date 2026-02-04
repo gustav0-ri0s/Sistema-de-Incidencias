@@ -28,9 +28,10 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     type: IncidentType.ESTUDIANTE,
-    level: SchoolLevel.PRIMARIA,
-    grade: '',
-    section: '',
+    classId: '',
+    level: SchoolLevel.PRIMARIA, // Keep for filtering
+    grade: '', // Keep for filtering
+    section: '', // Keep for filtering
     room_name: '',
     categoryId: '',
     otherCategorySuggestion: '',
@@ -100,10 +101,13 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
     if (!user) return;
     setIsSubmitting(true);
 
-    const { data, error } = await supabase
+    // 1. Insert Incident
+    const { data: incidentData, error: incidentError } = await supabase
       .from('incidents')
       .insert({
         type: formData.type,
+        classroom_id: formData.type === IncidentType.ESTUDIANTE && formData.classId ? parseInt(formData.classId) : null,
+        // Keep these for backward compatibility if columns still exist, but mainly classroom_id is the source of truth now
         level: formData.type === IncidentType.ESTUDIANTE ? formData.level : null,
         grade: formData.type === IncidentType.ESTUDIANTE ? formData.grade : null,
         section: formData.type === IncidentType.ESTUDIANTE ? formData.section : null,
@@ -113,37 +117,84 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
         teacher_id: user.id,
         category_id: formData.categoryId === 'other' ? null : parseInt(formData.categoryId),
         other_category_suggestion: formData.categoryId === 'other' ? formData.otherCategorySuggestion : null,
-        involved_students: formData.type === IncidentType.ESTUDIANTE ? formData.students : [],
         image_url: formData.imageUrl,
         status: IncidentStatus.REGISTRADA
       })
-      .select('correlative')
+      .select('id, correlative')
       .single();
 
-    if (!error && data) {
-      setCorrelative(data.correlative);
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        onClose();
-        setFormData({
-          type: IncidentType.ESTUDIANTE,
-          level: SchoolLevel.PRIMARIA,
-          grade: '',
-          section: '',
-          room_name: '',
-          categoryId: '',
-          otherCategorySuggestion: '',
-          incidentDate: getPeruTime(),
-          description: '',
-          students: [{ names: '', lastNames: '' }],
-          imageUrl: '',
-        });
-      }, 2500);
-    } else {
-      console.error(error);
-      alert("Error al guardar en Supabase");
+    if (incidentError || !incidentData) {
+      console.error(incidentError);
+      alert("Error al guardar la incidencia en Supabase");
+      setIsSubmitting(false);
+      return;
     }
+
+    // 2. Handle Students and Participants
+    if (formData.type === IncidentType.ESTUDIANTE && formData.students.length > 0) {
+      for (const student of formData.students) {
+        if (!student.names.trim() || !student.lastNames.trim()) continue;
+
+        // Try to get or create student
+        let studentId: string | null = null;
+
+        // Check if student exists
+        const { data: existingStudent } = await supabase
+          .from('students')
+          .select('id')
+          .eq('names', student.names.trim())
+          .eq('last_names', student.lastNames.trim())
+          .maybeSingle();
+
+        if (existingStudent) {
+          studentId = existingStudent.id;
+        } else {
+          // Create new student
+          const { data: newStudent, error: createError } = await supabase
+            .from('students')
+            .insert({ names: student.names.trim(), last_names: student.lastNames.trim() })
+            .select('id')
+            .single();
+
+          if (!createError && newStudent) {
+            studentId = newStudent.id;
+          }
+        }
+
+        if (studentId) {
+          // Create participant record
+          await supabase
+            .from('incident_participants')
+            .insert({
+              incident_id: incidentData.id,
+              student_id: studentId,
+              role: 'involucrado'
+            });
+        }
+      }
+    }
+
+    setCorrelative(incidentData.correlative);
+    setSuccess(true);
+    setTimeout(() => {
+      setSuccess(false);
+      onClose();
+      setFormData({
+        type: IncidentType.ESTUDIANTE,
+        classId: '',
+        level: SchoolLevel.PRIMARIA,
+        grade: '',
+        section: '',
+        room_name: '',
+        categoryId: '',
+        otherCategorySuggestion: '',
+        incidentDate: getPeruTime(),
+        description: '',
+        students: [{ names: '', lastNames: '' }],
+        imageUrl: '',
+      });
+    }, 2500);
+
     setIsSubmitting(false);
   };
 
@@ -213,14 +264,22 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
 
                     <select
                       className="w-full bg-white border-2 border-gray-100 rounded-xl px-4 py-3 outline-none focus:border-brand-turquoise font-bold text-gray-600"
-                      value={formData.section}
-                      onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                      value={formData.classId}
+                      onChange={(e) => {
+                        const selectedClass = classrooms.find(c => c.id.toString() === e.target.value);
+                        setFormData({
+                          ...formData,
+                          classId: e.target.value,
+                          grade: selectedClass ? selectedClass.grade : '',
+                          section: selectedClass ? selectedClass.section : ''
+                        });
+                      }}
                       required
                       disabled={!formData.grade}
                     >
                       <option value="">Sección</option>
                       {classrooms.filter(c => c.level === formData.level && c.grade === formData.grade).map(c => (
-                        <option key={c.id} value={c.section}>{c.section}</option>
+                        <option key={c.id} value={c.id}>{c.section}</option>
                       ))}
                     </select>
                   </div>

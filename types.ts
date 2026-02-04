@@ -40,6 +40,21 @@ export interface IncidentCategory {
   created_at: string;
 }
 
+export interface Student {
+  id: string;
+  names: string;
+  last_names: string;
+  created_at: string;
+}
+
+export interface IncidentParticipant {
+  id: string;
+  incident_id: string;
+  student_id: string;
+  role: string;
+  students?: Student;
+}
+
 export interface InvolvedStudent {
   names: string;
   lastNames: string;
@@ -50,21 +65,26 @@ export interface Incident {
   correlative: string;
   incident_date: string;
   type: IncidentType;
-  level: SchoolLevel;
-  grade: string;
-  section: string;
+  classroom_id?: number;
+  level?: SchoolLevel; // Deprecated
+  grade?: string; // Deprecated
+  section?: string; // Deprecated
   room_name?: string;
   category_id?: number;
   other_category_suggestion?: string;
   description: string;
   teacher_id: string;
-  involved_students?: InvolvedStudent[];
-  student_dni?: string;
-  student_code?: string;
+  involved_students?: InvolvedStudent[]; // Deprecated
   status: IncidentStatus;
   created_at: string;
   image_url?: string;
   // Join fields
   profiles?: { full_name: string };
   incident_categories?: { name: string };
+  classrooms?: {
+    level: SchoolLevel;
+    grade: string;
+    section: string;
+  };
+  incident_participants?: (IncidentParticipant & { students: Student })[];
 }

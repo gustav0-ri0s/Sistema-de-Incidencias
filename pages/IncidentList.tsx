@@ -45,7 +45,12 @@ const IncidentList: React.FC = () => {
       .select(`
         *,
         profiles:teacher_id (full_name),
-        incident_categories:category_id (name)
+        incident_categories:category_id (name),
+        classrooms:classroom_id (level, grade, section),
+        incident_participants (
+          role,
+          students (names, last_names)
+        )
       `)
       .order('created_at', { ascending: false });
 
@@ -122,7 +127,9 @@ const IncidentList: React.FC = () => {
     const categoryName = incident.incident_categories?.name || incident.other_category_suggestion || 'No especificada';
     const location = incident.type === IncidentType.GENERAL
       ? (incident.room_name || 'GENERAL')
-      : `${incident.level?.toUpperCase()} - ${incident.grade} "${incident.section}"`;
+      : incident.classrooms
+        ? `${incident.classrooms.level.toUpperCase()} - ${incident.classrooms.grade} "${incident.classrooms.section}"`
+        : `${incident.level?.toUpperCase()} - ${incident.grade} "${incident.section}"`;
 
     const details = [
       ['FECHA/HORA:', new Date(incident.incident_date).toLocaleString()],
@@ -131,9 +138,15 @@ const IncidentList: React.FC = () => {
       ['CATEGORÍA:', categoryName.toUpperCase()],
       ['ESTADO:', incident.status.toUpperCase()],
     ];
-    if (incident.type === IncidentType.ESTUDIANTE && incident.involved_students) {
-      const studentsList = incident.involved_students.map(s => `${s.names} ${s.lastNames}`).join(', ');
-      details.push(['ESTUDIANTES:', studentsList]);
+    if (incident.type === IncidentType.ESTUDIANTE) {
+      const participants = incident.incident_participants || [];
+      if (participants.length > 0) {
+        const studentsList = participants.map(p => `${p.students?.names} ${p.students?.last_names}`).join(', ');
+        details.push(['ESTUDIANTES:', studentsList]);
+      } else if (incident.involved_students) {
+        const studentsList = incident.involved_students.map(s => `${s.names} ${s.lastNames}`).join(', ');
+        details.push(['ESTUDIANTES:', studentsList]);
+      }
     }
     details.forEach((row, i) => {
       doc.setFont('helvetica', 'bold');
@@ -353,14 +366,25 @@ const IncidentList: React.FC = () => {
                       <Users className="w-4 h-4 mr-2 text-brand-turquoise" /> Involucrados
                     </label>
                     <div className="bg-white p-6 rounded-[2rem] border-2 border-gray-50 shadow-sm min-h-[200px]">
-                      {selectedIncident.type === IncidentType.ESTUDIANTE && selectedIncident.involved_students ? (
+                      {selectedIncident.type === IncidentType.ESTUDIANTE ? (
                         <div className="space-y-3">
-                          {selectedIncident.involved_students.map((s, i) => (
-                            <div key={i} className="flex items-center space-x-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                              <UserCheck className="w-5 h-5 text-blue-500" />
-                              <span className="text-sm font-black text-gray-800">{s.names} {s.lastNames}</span>
-                            </div>
-                          ))}
+                          {selectedIncident.incident_participants && selectedIncident.incident_participants.length > 0 ? (
+                            selectedIncident.incident_participants.map((p, i) => (
+                              <div key={i} className="flex items-center space-x-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                                <UserCheck className="w-5 h-5 text-blue-500" />
+                                <span className="text-sm font-black text-gray-800">{p.students?.names} {p.students?.last_names}</span>
+                              </div>
+                            ))
+                          ) : selectedIncident.involved_students ? (
+                            selectedIncident.involved_students.map((s, i) => (
+                              <div key={i} className="flex items-center space-x-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                                <UserCheck className="w-5 h-5 text-blue-500" />
+                                <span className="text-sm font-black text-gray-800">{s.names} {s.lastNames}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 italic">No hay estudiantes registrados.</span>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center space-x-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
