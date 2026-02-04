@@ -26,6 +26,7 @@ export const AuthContext = React.createContext<{
 const App: React.FC = () => {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -110,10 +111,10 @@ const App: React.FC = () => {
             <Route
               path="*"
               element={
-                <div className="flex min-h-screen bg-brand-light">
-                  <Sidebar />
+                <div className="flex min-h-screen bg-brand-light relative">
+                  <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
                   <div className="flex-1 flex flex-col min-w-0">
-                    <Header />
+                    <Header onMenuClick={() => setIsSidebarOpen(true)} />
                     <main className="p-4 md:p-8 flex-1 overflow-auto">
                       <Routes>
                         <Route path="/" element={<Dashboard />} />

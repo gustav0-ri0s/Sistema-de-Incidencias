@@ -1,10 +1,14 @@
 
 import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../App';
-import { UserCircle, Bell, Search, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { UserCircle, Bell, Search, Wifi, WifiOff, Loader2, Menu } from 'lucide-react';
 import { supabase } from '../supabase';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user } = useContext(AuthContext);
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error'>('checking');
 
@@ -29,8 +33,16 @@ const Header: React.FC = () => {
   }, []);
 
   return (
-    <header className="bg-white border-b border-gray-100 h-20 flex items-center justify-between px-10 sticky top-0 z-10 backdrop-blur-md bg-white/80">
-      <div className="flex-1 hidden lg:block"></div>
+    <header className="bg-white border-b border-gray-100 h-20 flex items-center justify-between px-4 md:px-10 sticky top-0 z-10 backdrop-blur-md bg-white/80">
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 text-gray-400 hover:text-brand-turquoise hover:bg-brand-light rounded-xl transition-all"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+        <div className="flex-1 hidden lg:block"></div>
+      </div>
 
       <div className="flex items-center space-x-6">
         {/* Indicador de Conexión Real-time */}
