@@ -1,23 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { SchoolLevel } from '../types';
-import { MapPin, Plus, X, Loader2, MapPinned, Trash2, CheckCircle, AlertCircle, Pencil } from 'lucide-react';
+import { Classroom, SchoolLevel } from '../types';
+import { MapPinned, Loader2, CheckCircle, Pencil, AlertCircle, X, Users } from 'lucide-react';
 
 const Salons: React.FC = () => {
-    const [salons, setSalons] = useState<any[]>([]);
+    const [salons, setSalons] = useState<Classroom[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [editingSalon, setEditingSalon] = useState<any | null>(null);
-    const [newSalon, setNewSalon] = useState({
-        level: SchoolLevel.SECUNDARIA,
-        grade: '',
-        section: ''
-    });
+    const [editingSalon, setEditingSalon] = useState<Classroom | null>(null);
     const [editForm, setEditForm] = useState({
-        level: SchoolLevel.SECUNDARIA,
-        grade: '',
-        section: ''
+        capacity: 0,
+        active: true
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,13 +20,18 @@ const Salons: React.FC = () => {
 
     const fetchSalons = async () => {
         setLoading(true);
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('classrooms')
             .select('*')
             .order('level')
             .order('grade')
             .order('section');
-        if (data) setSalons(data);
+
+        if (error) {
+            console.error('Error fetching salons:', error);
+        } else if (data) {
+            setSalons(data);
+        }
         setLoading(false);
     };
 
@@ -47,31 +45,17 @@ const Salons: React.FC = () => {
         }
     };
 
-    const handleAddSalon = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newSalon.grade || !newSalon.section) return;
-
-        setIsSubmitting(true);
-        const { error } = await supabase.from('classrooms').insert(newSalon);
-
-        if (error) {
-            alert("Error al crear salón: " + error.message);
-        } else {
-            setShowAddModal(false);
-            setNewSalon({ level: SchoolLevel.SECUNDARIA, grade: '', section: '' });
-            fetchSalons();
-        }
-        setIsSubmitting(false);
-    };
-
     const handleUpdateSalon = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingSalon || !editForm.grade || !editForm.section) return;
+        if (!editingSalon) return;
 
         setIsSubmitting(true);
         const { error } = await supabase
             .from('classrooms')
-            .update(editForm)
+            .update({
+                capacity: editForm.capacity,
+                active: editForm.active
+            })
             .eq('id', editingSalon.id);
 
         if (error) {
@@ -83,19 +67,11 @@ const Salons: React.FC = () => {
         setIsSubmitting(false);
     };
 
-    const deleteSalon = async (id: number) => {
-        if (!confirm("¿Eliminar este salón?")) return;
-        const { error } = await supabase.from('classrooms').delete().eq('id', id);
-        if (error) alert("No se puede eliminar: el salón está siendo usado.");
-        else fetchSalons();
-    };
-
-    const openEditModal = (salon: any) => {
+    const openEditModal = (salon: Classroom) => {
         setEditingSalon(salon);
         setEditForm({
-            level: salon.level,
-            grade: salon.grade,
-            section: salon.section
+            capacity: salon.capacity || 0,
+            active: salon.active
         });
     };
 
@@ -104,15 +80,14 @@ const Salons: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-4xl font-black text-gray-800 tracking-tight">Gestión de Salones</h1>
-                    <p className="text-gray-400 font-medium">Configuración de grados y secciones institucionales</p>
+                    <p className="text-gray-400 font-medium">Visualización y configuración de aforos</p>
                 </div>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-brand-turquoise text-white px-8 py-4 rounded-2xl font-black text-sm shadow-xl shadow-brand-turquoise/20 flex items-center space-x-2 hover:bg-brand-darkTurquoise transition-all"
-                >
-                    <Plus className="w-5 h-5" />
-                    <span>Nuevo Salón</span>
-                </button>
+                <div className="bg-blue-50 text-blue-600 px-6 py-4 rounded-2xl text-sm font-medium border border-blue-100 flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    <span>
+                        La creación y eliminación de salones se gestiona desde el sistema administrativo central.
+                    </span>
+                </div>
             </div>
 
             {loading ? (
@@ -133,6 +108,10 @@ const Salons: React.FC = () => {
                                     <div>
                                         <h3 className="font-black text-gray-800 uppercase text-lg leading-tight">{salon.level}</h3>
                                         <p className="text-gray-500 font-bold">{salon.grade} "{salon.section}"</p>
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-400 font-medium">
+                                            <Users className="w-3 h-3" />
+                                            <span>Capacidad: {salon.capacity || 0}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end space-y-2">
@@ -143,7 +122,7 @@ const Salons: React.FC = () => {
                                         <button
                                             onClick={() => openEditModal(salon)}
                                             className="p-2 text-gray-400 hover:text-brand-turquoise hover:bg-brand-light rounded-xl"
-                                            title="Editar"
+                                            title="Editar Capacidad"
                                         >
                                             <Pencil className="w-4 h-4" />
                                         </button>
@@ -154,13 +133,6 @@ const Salons: React.FC = () => {
                                         >
                                             <CheckCircle className={`w-4 h-4 ${salon.active ? 'text-emerald-500' : ''}`} />
                                         </button>
-                                        <button
-                                            onClick={() => deleteSalon(salon.id)}
-                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl"
-                                            title="Eliminar"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -170,65 +142,9 @@ const Salons: React.FC = () => {
                         <div className="col-span-full py-20 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200 text-center">
                             <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                             <p className="font-black text-gray-400 uppercase tracking-widest text-sm">No hay salones registrados</p>
+                            <p className="text-xs text-gray-400 mt-2">Contacte al administrador del sistema central para agregar nuevos salones.</p>
                         </div>
                     )}
-                </div>
-            )}
-
-            {showAddModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="bg-brand-turquoise p-8 text-white flex justify-between items-center">
-                            <h2 className="text-xl font-black flex items-center space-x-2">
-                                <Plus className="w-6 h-6" />
-                                <span>Nuevo Salón</span>
-                            </h2>
-                            <button onClick={() => setShowAddModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAddSalon} className="p-8 space-y-6">
-                            <div className="space-y-4">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block ml-1">Nivel Académico</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {Object.values(SchoolLevel).map((lvl) => (
-                                        <button
-                                            key={lvl}
-                                            type="button"
-                                            onClick={() => setNewSalon({ ...newSalon, level: lvl })}
-                                            className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${newSalon.level === lvl
-                                                ? 'border-brand-turquoise bg-brand-turquoise/10 text-brand-turquoise'
-                                                : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
-                                                }`}
-                                        >
-                                            {lvl}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest block pl-1">Grado</label>
-                                    <input required type="text" className="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all shadow-inner" placeholder="Ej. 1ro, 5años" value={newSalon.grade} onChange={e => setNewSalon({ ...newSalon, grade: e.target.value })} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest block pl-1">Sección</label>
-                                    <input required type="text" className="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all shadow-inner" placeholder="Ej. A, B, única" value={newSalon.section} onChange={e => setNewSalon({ ...newSalon, section: e.target.value })} />
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="w-full py-5 bg-brand-turquoise text-white font-black rounded-2xl shadow-xl shadow-brand-turquoise/20 hover:bg-brand-darkTurquoise transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                            >
-                                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                                <span>{isSubmitting ? 'Creando...' : 'Crear Registro'}</span>
-                            </button>
-                        </form>
-                    </div>
                 </div>
             )}
 
@@ -246,34 +162,34 @@ const Salons: React.FC = () => {
                         </div>
 
                         <form onSubmit={handleUpdateSalon} className="p-8 space-y-6">
-                            <div className="space-y-4">
-                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block ml-1">Nivel Académico</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {Object.values(SchoolLevel).map((lvl) => (
-                                        <button
-                                            key={lvl}
-                                            type="button"
-                                            onClick={() => setEditForm({ ...editForm, level: lvl })}
-                                            className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${editForm.level === lvl
-                                                ? 'border-brand-turquoise bg-brand-turquoise/10 text-brand-turquoise'
-                                                : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
-                                                }`}
-                                        >
-                                            {lvl}
-                                        </button>
-                                    ))}
+                            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Nivel</label>
+                                    <div className="font-bold text-gray-700 capitalize">{editingSalon.level}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Grado/Sección</label>
+                                    <div className="font-bold text-gray-700">{editingSalon.grade} - "{editingSalon.section}"</div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest block pl-1">Grado</label>
-                                    <input required type="text" className="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all shadow-inner" placeholder="Ej. 1ro, 5años" value={editForm.grade} onChange={e => setEditForm({ ...editForm, grade: e.target.value })} />
+                            <div className="space-y-4">
+                                <label className="text-xs font-black text-gray-400 uppercase tracking-widest block pl-1">Capacidad de Alumnos</label>
+                                <div className="relative">
+                                    <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0"
+                                        className="w-full pl-12 pr-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all shadow-inner"
+                                        placeholder="0"
+                                        value={editForm.capacity}
+                                        onChange={e => setEditForm({ ...editForm, capacity: parseInt(e.target.value) || 0 })}
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest block pl-1">Sección</label>
-                                    <input required type="text" className="w-full px-5 py-4 rounded-2xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all shadow-inner" placeholder="Ej. A, B, única" value={editForm.section} onChange={e => setEditForm({ ...editForm, section: e.target.value })} />
-                                </div>
+                                <p className="text-xs text-gray-400 pl-1">
+                                    Este valor se utiliza para calcular el aforo disponible.
+                                </p>
                             </div>
 
                             <div className="flex gap-4">

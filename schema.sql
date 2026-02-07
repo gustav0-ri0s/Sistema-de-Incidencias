@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS incidents (
   level school_level,
   grade TEXT,
   section TEXT,
+  classroom_id BIGINT REFERENCES classrooms(id),
   room_name TEXT,
   category_id BIGINT REFERENCES incident_categories(id),
   other_category_suggestion TEXT,
@@ -78,6 +79,14 @@ ALTER TABLE incident_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
 
 -- Políticas de Incidencias
+-- 4.1 Políticas de Perfiles
+CREATE POLICY "Ver Perfiles" ON profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Actualizar Propio Perfil" ON profiles FOR UPDATE TO authenticated USING (id = auth.uid());
+
+-- 4.2 Políticas de Categorías
+CREATE POLICY "Ver Categorias" ON incident_categories FOR SELECT TO authenticated USING (true);
+
+-- 4.3 Políticas de Incidencias
 DROP POLICY IF EXISTS "Ver Incidencias" ON incidents;
 CREATE POLICY "Ver Incidencias" ON incidents FOR SELECT 
 TO authenticated 

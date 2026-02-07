@@ -74,7 +74,7 @@ const Reports: React.FC = () => {
           profiles:teacher_id(full_name),
           incident_categories:category_id(name),
           classrooms:classroom_id(level, grade, section),
-          incident_participants(students(names, last_names))
+          incident_participants(students(first_name, last_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -121,7 +121,7 @@ const Reports: React.FC = () => {
       if (activeReport === 'student' && studentSearch) {
         results = results.filter(inc =>
           inc.incident_participants?.some((p: any) =>
-            `${p.students?.names} ${p.students?.last_names}`.toLowerCase().includes(studentSearch.toLowerCase())
+            `${p.students?.first_name} ${p.students?.last_name}`.toLowerCase().includes(studentSearch.toLowerCase())
           ) ||
           inc.involved_students?.some((s: any) =>
             `${s.names} ${s.lastNames}`.toLowerCase().includes(studentSearch.toLowerCase())
@@ -194,7 +194,7 @@ const Reports: React.FC = () => {
           inc.correlative,
           new Date(inc.incident_date).toLocaleDateString(),
           inc.incident_participants?.length > 0
-            ? inc.incident_participants.map((p: any) => `${p.students?.names} ${p.students?.last_names}`).join(', ')
+            ? inc.incident_participants.map((p: any) => `${p.students?.first_name} ${p.students?.last_name}`).join(', ')
             : inc.involved_students?.map((s: any) => `${s.names} ${s.lastNames}`).join(', ') || 'N/A',
           inc.incident_categories?.name || inc.other_category_suggestion || 'Otro',
           inc.status.toUpperCase()
@@ -444,7 +444,7 @@ const Reports: React.FC = () => {
                             inc.incident_participants.map((p: any, i: number) => (
                               <div key={i} className="text-sm font-black text-gray-800 flex items-center gap-2">
                                 <UserCheck className="w-3 h-3 text-gray-400" />
-                                {p.students?.names} {p.students?.last_names}
+                                {p.students?.first_name} {p.students?.last_name}
                               </div>
                             ))
                           ) : inc.involved_students && inc.involved_students.length > 0 ? (

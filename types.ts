@@ -42,8 +42,8 @@ export interface IncidentCategory {
 
 export interface Student {
   id: string;
-  names: string;
-  last_names: string;
+  first_name: string;
+  last_name: string;
   created_at: string;
 }
 
@@ -87,4 +87,14 @@ export interface Incident {
     section: string;
   };
   incident_participants?: (IncidentParticipant & { students: Student })[];
+}
+
+export interface Classroom {
+  id: number;
+  level: SchoolLevel;
+  grade: string;
+  section: string;
+  capacity: number;
+  active: boolean;
+  created_at: string;
 }

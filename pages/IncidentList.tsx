@@ -49,7 +49,7 @@ const IncidentList: React.FC = () => {
         classrooms:classroom_id (level, grade, section),
         incident_participants (
           role,
-          students (names, last_names)
+          students (first_name, last_name)
         )
       `)
       .order('created_at', { ascending: false });
@@ -141,7 +141,7 @@ const IncidentList: React.FC = () => {
     if (incident.type === IncidentType.ESTUDIANTE) {
       const participants = incident.incident_participants || [];
       if (participants.length > 0) {
-        const studentsList = participants.map(p => `${p.students?.names} ${p.students?.last_names}`).join(', ');
+        const studentsList = participants.map(p => `${p.students?.first_name} ${p.students?.last_name}`).join(', ');
         details.push(['ESTUDIANTES:', studentsList]);
       } else if (incident.involved_students) {
         const studentsList = incident.involved_students.map(s => `${s.names} ${s.lastNames}`).join(', ');
