@@ -45,11 +45,11 @@ const Dashboard: React.FC = () => {
       .select('*', { count: 'exact', head: true })
       .eq('teacher_id', user?.id);
 
-    // 2. Pendientes (Registrada o Leída)
+    // 2. Pendientes (Todas menos Resuelta)
     const { count: pending } = await supabase
       .from('incidents')
       .select('*', { count: 'exact', head: true })
-      .in('status', [IncidentStatus.REGISTRADA, IncidentStatus.LEIDA]);
+      .neq('status', IncidentStatus.RESUELTA);
 
     // 3. Resueltas
     const { count: resolved } = await supabase
