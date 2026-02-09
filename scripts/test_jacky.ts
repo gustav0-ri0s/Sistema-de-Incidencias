@@ -9,16 +9,45 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function testJacky() {
     console.log('Testing login for miss.jacky@muivc.com with password password123');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: 'miss.jacky@muivc.com',
         password: 'password123',
     });
 
-    if (error) {
-        console.error('LOGIN FAILED:', error.message);
+    if (authError) {
+        console.error('LOGIN FAILED:', authError.message);
+        return;
+    }
+
+    console.log('LOGIN SUCCESSFUL!');
+    const userId = authData.user.id;
+    console.log('User ID:', userId);
+
+    // Now test incident visibility
+    const { count, error: countError } = await supabase
+        .from('incidents')
+        .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+        console.error('Error fetching incidents:', countError.message);
     } else {
-        console.log('LOGIN SUCCESSFUL!');
-        console.log('User ID:', data.user.id);
+        console.log('Incidents visible for Jacky:', count);
+    }
+
+    // Verify they all belong to her
+    const { data: incidents, error: fetchError } = await supabase
+        .from('incidents')
+        .select('teacher_id');
+
+    if (fetchError) {
+        console.error('Error fetching records:', fetchError.message);
+    } else {
+        const others = incidents?.filter(i => i.teacher_id !== userId);
+        if (others && others.length > 0) {
+            console.error('FAILURE: Detected incidents belonging to other teachers!', others.length);
+        } else {
+            console.log('SUCCESS: All visible incidents belong to the logged-in user.');
+        }
     }
 }
 
