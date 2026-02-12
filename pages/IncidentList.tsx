@@ -21,7 +21,10 @@ import {
   User as UserIcon,
   RotateCcw,
   Info,
-  Image as ImageIcon
+  Image as ImageIcon,
+  History,
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -33,6 +36,18 @@ const IncidentList: React.FC = () => {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [tempStatus, setTempStatus] = useState<IncidentStatus | null>(null);
+  const [resolutionDetails, setResolutionDetails] = useState('');
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isLoading?: boolean;
+    type?: 'danger' | 'warning' | 'info';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   useEffect(() => {
     fetchIncidents();
@@ -50,6 +65,10 @@ const IncidentList: React.FC = () => {
         incident_participants (
           role,
           students (first_name, last_name)
+        ),
+        incident_logs (
+          *,
+          profiles:created_by (full_name)
         )
       `)
       .order('created_at', { ascending: false });
@@ -63,22 +82,55 @@ const IncidentList: React.FC = () => {
     setLoading(false);
   };
 
-  const updateStatus = async (id: string, newStatus: IncidentStatus) => {
+  const updateStatus = async (id: string, newStatus: IncidentStatus, details?: string) => {
     const currentIncident = incidents.find(i => i.id === id);
     if (currentIncident?.status === IncidentStatus.RESUELTA && user?.role !== UserRole.ADMIN) {
       alert("Solo el administrador puede revertir una incidencia ya resuelta.");
       return;
     }
 
+    const updatePayload: any = { status: newStatus };
+    if (details !== undefined) {
+      updatePayload.resolution_details = details;
+    }
+
     const { error } = await supabase
       .from('incidents')
-      .update({ status: newStatus })
+      .update(updatePayload)
       .eq('id', id);
 
     if (!error) {
-      setIncidents(prev => prev.map(inc => inc.id === id ? { ...inc, status: newStatus } : inc));
+      // If there are details, save to incident_logs
+      if (details && user) {
+        await supabase.from('incident_logs').insert({
+          incident_id: id,
+          status: newStatus,
+          comment: details,
+          created_by: user.id
+        });
+      }
+
+      // Refresh incidents to get the latest logs
+      fetchIncidents();
+
+      setTempStatus(null);
+      setResolutionDetails('');
+
+      // Update selected incident if it's the one being modified
       if (selectedIncident?.id === id) {
-        setSelectedIncident(prev => prev ? { ...prev, status: newStatus } : null);
+        // We'll let fetchIncidents refresh the list, but for immediate UI response:
+        const { data: updatedLogs } = await supabase
+          .from('incident_logs')
+          .select('*, profiles:created_by(full_name)')
+          .eq('incident_id', id)
+          .order('created_at', { ascending: false });
+
+        setSelectedIncident(prev => prev ? {
+          ...prev,
+          status: newStatus,
+          resolution_details: details ?? prev.resolution_details,
+          incident_logs: updatedLogs as any
+        } : null);
       }
     }
   };
@@ -88,6 +140,104 @@ const IncidentList: React.FC = () => {
       await updateStatus(incident.id, IncidentStatus.LEIDA);
     }
     setSelectedIncident(incident);
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!selectedIncident) return;
+
+    setConfirmModal(prev => ({ ...prev, isLoading: true }));
+
+    const { error: deleteError } = await supabase
+      .from('incident_logs')
+      .delete()
+      .eq('id', logId);
+
+    if (deleteError) {
+      console.error(deleteError);
+      alert("Error al eliminar el registro.");
+      setConfirmModal({ ...confirmModal, isOpen: false, isLoading: false });
+      return;
+    }
+
+    // Fetch remaining logs to determine new status
+    const { data: remainingLogs } = await supabase
+      .from('incident_logs')
+      .select('*')
+      .eq('incident_id', selectedIncident.id)
+      .order('created_at', { ascending: false });
+
+    let newStatus = IncidentStatus.LEIDA; // Default status if no logs left
+    let newDetails = null;
+
+    if (remainingLogs && remainingLogs.length > 0) {
+      newStatus = remainingLogs[0].status;
+      newDetails = remainingLogs[0].comment;
+    }
+
+    // Update incident status and resolution details sync
+    await supabase
+      .from('incidents')
+      .update({
+        status: newStatus,
+        resolution_details: newDetails
+      })
+      .eq('id', selectedIncident.id);
+
+    fetchIncidents();
+
+    if (selectedIncident.id) {
+      // Refresh detail view
+      const { data: updatedLogs } = await supabase
+        .from('incident_logs')
+        .select('*, profiles:created_by(full_name)')
+        .eq('incident_id', selectedIncident.id)
+        .order('created_at', { ascending: false });
+
+      setSelectedIncident(prev => prev ? {
+        ...prev,
+        status: newStatus,
+        incident_logs: updatedLogs as any
+      } : null);
+    }
+
+    setConfirmModal({ ...confirmModal, isOpen: false, isLoading: false });
+  };
+
+  const openDeleteConfirm = (logId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Registro',
+      message: '¿Está seguro de eliminar este registro del historial? Esta acción podría revertir el estado de la incidencia.',
+      type: 'danger',
+      onConfirm: () => handleDeleteLog(logId)
+    });
+  };
+
+  const handleUpdateLog = async (logId: string, newComment: string) => {
+    if (!newComment.trim()) return;
+
+    const { error } = await supabase
+      .from('incident_logs')
+      .update({ comment: newComment })
+      .eq('id', logId);
+
+    if (!error) {
+      fetchIncidents();
+      setEditingLogId(null);
+
+      if (selectedIncident) {
+        const { data: updatedLogs } = await supabase
+          .from('incident_logs')
+          .select('*, profiles:created_by(full_name)')
+          .eq('incident_id', selectedIncident.id)
+          .order('created_at', { ascending: false });
+
+        setSelectedIncident(prev => prev ? {
+          ...prev,
+          incident_logs: updatedLogs as any
+        } : null);
+      }
+    }
   };
 
   const getStatusStyle = (status: IncidentStatus) => {
@@ -160,6 +310,34 @@ const IncidentList: React.FC = () => {
     doc.setFont('helvetica', 'normal');
     const splitDesc = doc.splitTextToSize(incident.description, pageWidth - 40);
     doc.text(splitDesc, 20, descY + 10);
+
+    if (incident.incident_logs && incident.incident_logs.length > 0) {
+      let currentY = descY + 10 + (splitDesc.length * 7) + 15;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setDrawColor(91, 201, 213);
+      doc.text('HISTORIAL DE ACCIONES / RESOLUCIÓN:', 20, currentY);
+
+      incident.incident_logs
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // PDF chronologically
+        .forEach((log) => {
+          currentY += 10;
+          if (currentY > 270) { doc.addPage(); currentY = 20; }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          const header = `[${log.status.toUpperCase()}] - ${new Date(log.created_at).toLocaleString()} - POR: ${log.profiles?.full_name || 'PERSONAL'}`;
+          doc.text(header, 20, currentY);
+
+          currentY += 5;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(11);
+          const splitLog = doc.splitTextToSize(log.comment, pageWidth - 40);
+          doc.text(splitLog, 20, currentY);
+          currentY += (splitLog.length * 6) + 5;
+        });
+    }
+
     doc.save(`incidencia-${incident.correlative}.pdf`);
   };
 
@@ -269,7 +447,7 @@ const IncidentList: React.FC = () => {
       </div>
 
       {selectedIncident && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setSelectedIncident(null)}></div>
           <div className="relative bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100 flex flex-col max-h-[90vh]">
 
@@ -314,10 +492,13 @@ const IncidentList: React.FC = () => {
                       </button>
                     )}
 
-                    {!(selectedIncident.status === IncidentStatus.RESUELTA && user?.role !== UserRole.ADMIN) && (
+                    {!(selectedIncident.status === IncidentStatus.RESUELTA && user?.role !== UserRole.ADMIN) && !tempStatus && (
                       <>
                         <button
-                          onClick={() => updateStatus(selectedIncident.id, IncidentStatus.ATENCION)}
+                          onClick={() => {
+                            setTempStatus(IncidentStatus.ATENCION);
+                            setResolutionDetails('');
+                          }}
                           className={`px-5 py-3 text-[10px] font-black uppercase rounded-2xl transition-all shadow-md flex items-center space-x-2 ${selectedIncident.status === IncidentStatus.ATENCION ? 'bg-amber-500 text-white' : 'bg-white text-amber-600 hover:bg-amber-50 border border-amber-100'
                             }`}
                         >
@@ -325,13 +506,63 @@ const IncidentList: React.FC = () => {
                           <span>Atención</span>
                         </button>
                         <button
-                          onClick={() => updateStatus(selectedIncident.id, IncidentStatus.RESUELTA)}
+                          onClick={() => {
+                            setTempStatus(IncidentStatus.RESUELTA);
+                            setResolutionDetails('');
+                          }}
                           className="px-5 py-3 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/30 flex items-center space-x-2"
                         >
                           <CheckCircle className="w-4 h-4" />
                           <span>Resolver</span>
                         </button>
                       </>
+                    )}
+
+                    {tempStatus && (
+                      <div className="w-full mt-4 p-6 bg-white rounded-3xl border-2 border-brand-turquoise/20 animate-in slide-in-from-top-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">
+                            Explique la acción tomada o resolución:
+                          </label>
+                          <span className={`px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 ${getStatusStyle(tempStatus)}`}>
+                            Cambiando a: {tempStatus}
+                          </span>
+                        </div>
+                        <textarea
+                          className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-5 py-4 outline-none focus:bg-white focus:border-brand-turquoise transition-all font-medium text-gray-700 shadow-inner mb-4"
+                          rows={3}
+                          placeholder={tempStatus === IncidentStatus.RESUELTA ? "Describa cómo se resolvió la incidencia..." : "Describa las acciones de atención tomadas..."}
+                          value={resolutionDetails}
+                          onChange={(e) => setResolutionDetails(e.target.value)}
+                          required
+                        />
+                        <div className="flex justify-end space-x-3">
+                          <button
+                            onClick={() => {
+                              setTempStatus(null);
+                              setResolutionDetails('');
+                            }}
+                            className="px-6 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!resolutionDetails.trim()) {
+                                alert("Por favor, ingrese una explicación.");
+                                return;
+                              }
+                              setIsUpdatingStatus(true);
+                              await updateStatus(selectedIncident.id, tempStatus, resolutionDetails);
+                              setIsUpdatingStatus(false);
+                            }}
+                            disabled={isUpdatingStatus}
+                            className={`px-8 py-2 text-white text-[10px] font-black uppercase rounded-xl shadow-lg transition-all ${tempStatus === IncidentStatus.RESUELTA ? 'bg-emerald-600 shadow-emerald-600/20' : 'bg-amber-500 shadow-amber-500/20'}`}
+                          >
+                            {isUpdatingStatus ? 'Guardando...' : 'Confirmar y Guardar'}
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -409,6 +640,87 @@ const IncidentList: React.FC = () => {
                 </div>
               </div>
 
+              {selectedIncident.incident_logs && selectedIncident.incident_logs.length > 0 && (
+                <div className="space-y-6">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                    <History className="w-4 h-4 mr-2 text-brand-turquoise" /> Historial de Acciones / Resolución
+                  </label>
+                  <div className="space-y-4">
+                    {selectedIncident.incident_logs
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .map((log, i) => (
+                        <div key={log.id} className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 flex flex-col space-y-3 relative overflow-hidden animate-in fade-in slide-in-from-left-4 duration-300" style={{ animationDelay: `${i * 100}ms` }}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${getStatusStyle(log.status)}`}>
+                                {log.status}
+                              </span>
+                              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                {new Date(log.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-[10px] font-bold text-brand-turquoise bg-brand-turquoise/5 px-3 py-1 rounded-full">
+                                Por: {log.profiles?.full_name || 'Personal Autorizado'}
+                              </span>
+                              {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR) && (
+                                <div className="flex items-center border-l pl-2 border-gray-200 ml-1 space-x-1">
+                                  <button
+                                    onClick={() => setEditingLogId(log.id)}
+                                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                    title="Editar comentario"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => openDeleteConfirm(log.id)}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    title="Eliminar registro"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {editingLogId === log.id ? (
+                            <div className="space-y-3 mt-2">
+                              <textarea
+                                className="w-full bg-white border-2 border-brand-turquoise/20 rounded-xl px-4 py-3 outline-none focus:border-brand-turquoise font-medium text-gray-700 shadow-sm"
+                                rows={2}
+                                defaultValue={log.comment}
+                                id={`edit-log-${log.id}`}
+                              />
+                              <div className="flex justify-end space-x-2">
+                                <button
+                                  onClick={() => setEditingLogId(null)}
+                                  className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-3 py-1"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const val = (document.getElementById(`edit-log-${log.id}`) as HTMLTextAreaElement).value;
+                                    handleUpdateLog(log.id, val);
+                                  }}
+                                  className="bg-brand-turquoise text-white text-[10px] font-black uppercase px-4 py-1.5 rounded-lg shadow-md"
+                                >
+                                  Actualizar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-gray-700 font-medium leading-relaxed">
+                              {log.comment}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-8 border-t border-gray-100 flex justify-between items-center">
                 <button
                   onClick={() => generatePDF(selectedIncident)}
@@ -425,6 +737,41 @@ const IncidentList: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => !confirmModal.isLoading && setConfirmModal({ ...confirmModal, isOpen: false })}></div>
+          <div className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100 p-8 text-center">
+            <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 ${confirmModal.type === 'danger' ? 'bg-red-100 text-red-600' :
+              confirmModal.type === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
+              }`}>
+              {confirmModal.type === 'danger' ? <Trash2 className="w-10 h-10" /> : <AlertCircle className="w-10 h-10" />}
+            </div>
+            <h3 className="text-2xl font-black text-gray-800 mb-2">{confirmModal.title}</h3>
+            <p className="text-gray-500 font-medium mb-8">{confirmModal.message}</p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                disabled={confirmModal.isLoading}
+                className="flex-1 px-6 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl hover:bg-gray-200 transition-all uppercase tracking-widest text-xs"
+              >
+                No, marchar atrás
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                disabled={confirmModal.isLoading}
+                className={`flex-1 px-6 py-4 text-white font-black rounded-2xl transition-all uppercase tracking-widest text-xs shadow-lg ${confirmModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700 shadow-red-600/30' :
+                  confirmModal.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' :
+                    'bg-brand-turquoise hover:bg-brand-turquoise/80 shadow-brand-turquoise/30'
+                  }`}
+              >
+                {confirmModal.isLoading ? 'Procesando...' : 'Sí, confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`.custom-scrollbar::-webkit-scrollbar { width: 8px; } .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }`}</style>
     </div>
   );

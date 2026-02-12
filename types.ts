@@ -60,6 +60,16 @@ export interface InvolvedStudent {
   lastNames: string;
 }
 
+export interface IncidentLog {
+  id: string;
+  incident_id: string;
+  status: IncidentStatus;
+  comment: string;
+  created_by: string;
+  created_at: string;
+  profiles?: { full_name: string };
+}
+
 export interface Incident {
   id: string;
   correlative: string;
@@ -78,6 +88,7 @@ export interface Incident {
   status: IncidentStatus;
   created_at: string;
   image_url?: string;
+  resolution_details?: string;
   // Join fields
   profiles?: { full_name: string };
   incident_categories?: { name: string };
@@ -87,6 +98,7 @@ export interface Incident {
     section: string;
   };
   incident_participants?: (IncidentParticipant & { students: Student })[];
+  incident_logs?: IncidentLog[];
 }
 
 export interface Classroom {
