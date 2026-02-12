@@ -2,8 +2,9 @@
 import React, { useState, useRef, useContext } from 'react';
 import { supabase } from '../supabase';
 import { AuthContext } from '../App';
-import { X, Save, MapPin, CheckCircle, AlertCircle, Plus, Trash2, Users, Image as ImageIcon, Camera, Lightbulb, Database } from 'lucide-react';
+import { X, Save, MapPin, CheckCircle, AlertCircle, Plus, Trash2, Users, Image as ImageIcon, Camera, Lightbulb, Database, Search } from 'lucide-react';
 import { IncidentType, SchoolLevel, InvolvedStudent, IncidentStatus } from '../types';
+import StudentSearch from './StudentSearch';
 
 const getPeruTime = () => {
   const now = new Date();
@@ -48,6 +49,10 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [correlative, setCorrelative] = useState('');
+
+  // Search State
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [searchingStudentIndex, setSearchingStudentIndex] = useState<number | null>(null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -96,6 +101,15 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
     setFormData({ ...formData, students: newStudents });
   };
 
+  const handleSelectStudent = (index: number, student: { names: string; lastNames: string }) => {
+    const newStudents = [...formData.students];
+    newStudents[index] = {
+      names: `${student.names} ${student.lastNames}`.trim(),
+      lastNames: ''
+    };
+    setFormData({ ...formData, students: newStudents });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -133,7 +147,12 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
     // 2. Handle Students and Participants
     if (formData.type === IncidentType.ESTUDIANTE && formData.students.length > 0) {
       for (const student of formData.students) {
-        if (!student.names.trim() || !student.lastNames.trim()) continue;
+        if (!student.names.trim()) continue;
+
+        // Split names field into first_name and last_name
+        const nameParts = student.names.trim().split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ') || ' ';
 
         // Try to get or create student
         let studentId: string | null = null;
@@ -142,8 +161,8 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
         const { data: existingStudent } = await supabase
           .from('students')
           .select('id')
-          .eq('names', student.names.trim())
-          .eq('last_names', student.lastNames.trim())
+          .eq('first_name', firstName)
+          .eq('last_name', lastName)
           .maybeSingle();
 
         if (existingStudent) {
@@ -152,7 +171,7 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
           // Create new student
           const { data: newStudent, error: createError } = await supabase
             .from('students')
-            .insert({ names: student.names.trim(), last_names: student.lastNames.trim() })
+            .insert({ first_name: firstName, last_name: lastName })
             .select('id')
             .single();
 
@@ -349,23 +368,28 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
                   <div className="space-y-4">
                     {formData.students.map((student, index) => (
                       <div key={index} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-200">
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          <input
-                            type="text"
-                            placeholder="Nombre del Alumno"
-                            className="bg-gray-50 border-2 border-transparent rounded-xl px-4 py-2.5 outline-none focus:bg-white focus:border-brand-turquoise transition-all font-bold text-gray-700 text-sm"
-                            value={student.names}
-                            onChange={(e) => updateStudent(index, 'names', e.target.value)}
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Apellidos"
-                            className="bg-gray-50 border-2 border-transparent rounded-xl px-4 py-2.5 outline-none focus:bg-white focus:border-brand-turquoise transition-all font-bold text-gray-700 text-sm"
-                            value={student.lastNames}
-                            onChange={(e) => updateStudent(index, 'lastNames', e.target.value)}
-                            required
-                          />
+                        <div className="flex-1 flex gap-2 items-center">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              placeholder="Nombre Completo del Alumno"
+                              className="w-full bg-gray-50 border-2 border-transparent rounded-xl px-4 py-2.5 outline-none focus:bg-white focus:border-brand-turquoise transition-all font-bold text-gray-700 text-sm"
+                              value={student.names}
+                              onChange={(e) => updateStudent(index, 'names', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearchingStudentIndex(index);
+                              setIsSearchingStudent(true);
+                            }}
+                            className="shrink-0 p-3 bg-brand-turquoise text-white rounded-xl shadow-lg shadow-brand-turquoise/20 hover:bg-brand-darkTurquoise transition-all active:scale-95"
+                            title="Buscar Estudiante Registrado"
+                          >
+                            <Search className="w-5 h-5" />
+                          </button>
                         </div>
                         {formData.students.length > 1 && (
                           <button
@@ -408,6 +432,14 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
           </form>
+        )}
+
+        {isSearchingStudent && searchingStudentIndex !== null && (
+          <StudentSearch
+            onClose={() => setIsSearchingStudent(false)}
+            onSelect={(student) => handleSelectStudent(searchingStudentIndex, student)}
+            classId={formData.classId}
+          />
         )}
       </div>
     </div>

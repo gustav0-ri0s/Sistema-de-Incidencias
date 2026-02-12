@@ -603,7 +603,7 @@ const IncidentList: React.FC = () => {
                             selectedIncident.incident_participants.map((p, i) => (
                               <div key={i} className="flex items-center space-x-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                                 <UserCheck className="w-5 h-5 text-blue-500" />
-                                <span className="text-sm font-black text-gray-800">{p.students?.names} {p.students?.last_names}</span>
+                                <span className="text-sm font-black text-gray-800">{p.students?.first_name} {p.students?.last_name}</span>
                               </div>
                             ))
                           ) : selectedIncident.involved_students ? (

@@ -16,11 +16,33 @@ async function inspectSchema() {
         else if (incidents.length > 0) console.log('✅ Sample Incident Keys:', Object.keys(incidents[0]));
         else console.log('⚠️ Incidents table empty, cannot infer columns from data.');
 
-        // Check classrooms columns
-        const { data: classrooms, error: classError } = await supabase.from('classrooms').select('*').limit(1);
-        if (classError) console.error('Error fetching classrooms:', classError.message);
-        else if (classrooms.length > 0) console.log('✅ Sample Classroom Keys:', Object.keys(classrooms[0]));
-        else console.log('⚠️ Classrooms table empty.');
+        // Check students columns
+        const { data: students, error: studError } = await supabase.from('students').select('*').limit(1);
+        if (studError) {
+            console.error('Error fetching students:', studError.message);
+        } else {
+            console.log('✅ Students table accessible.');
+            if (students.length > 0) {
+                console.log('✅ Sample Student Keys:', Object.keys(students[0]));
+            } else {
+                console.log('⚠️ Students table empty. Attempting to infer columns from schema...');
+                // Query information_schema to get column names even if table is empty
+                const { data: columns, error: colError } = await supabase
+                    .from('information_schema.columns')
+                    .select('column_name')
+                    .eq('table_schema', 'public') // Assuming 'public' schema
+                    .eq('table_name', 'students')
+                    .order('ordinal_position', { ascending: true });
+
+                if (colError) {
+                    console.error('Error fetching student table schema:', colError.message);
+                } else if (columns.length > 0) {
+                    console.log('✅ Student Table Columns (from schema):', columns.map(col => col.column_name));
+                } else {
+                    console.log('❌ Could not infer student table columns from schema.');
+                }
+            }
+        }
 
     } catch (err) {
         console.error('Unexpected error:', err);
