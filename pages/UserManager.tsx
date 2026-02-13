@@ -9,15 +9,6 @@ const UserManager: React.FC = () => {
   const [showSqlSetup, setShowSqlSetup] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Edit User State
-  const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    email: '',
-    password: '',
-    active: true,
-    role: UserRole.DOCENTE
-  });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -46,44 +37,13 @@ const UserManager: React.FC = () => {
     }
   };
 
-  const openEditUser = (user: Profile) => {
-    setEditingUser(user);
-    setEditForm({
-      full_name: user.full_name,
-      email: user.email || '',
-      password: '',
-      active: user.active || false,
-      role: user.role
-    });
-  };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
-    setIsSaving(true);
-    try {
-      const { error } = await supabase.rpc('update_user_admin', {
-        target_user_id: editingUser.id,
-        new_full_name: editForm.full_name,
-        new_email: editForm.email,
-        new_password: editForm.password,
-        is_active: editForm.active,
-        new_role: editForm.role
-      });
-      if (error) throw error;
-      setEditingUser(null);
-      fetchUsers();
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
       case UserRole.ADMIN: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase"><ShieldAlert className="w-3 h-3" /><span>Admin</span></div>;
       case UserRole.SUPERVISOR: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black uppercase"><ShieldCheck className="w-3 h-3" /><span>Supervisor</span></div>;
+      case UserRole.SECRETARIA: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase"><ShieldCheck className="w-3 h-3" /><span>Secretaria</span></div>;
       default: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] font-black uppercase"><Shield className="w-3 h-3" /><span>Docente</span></div>;
     }
   };
@@ -95,7 +55,7 @@ SET role = 'admin'
 WHERE id IN (SELECT id FROM auth.users WHERE email = 'tu-correo@ejemplo.com');
 
 -- 2. TABLAS E INFRAESTRUCTURA (Ejecutar una sola vez)
-CREATE TYPE user_role AS ENUM ('docente', 'supervisor', 'admin');
+CREATE TYPE user_role AS ENUM ('docente', 'secretaria', 'supervisor', 'admin');
 CREATE TYPE incident_type AS ENUM ('estudiante', 'aula', 'general');
 CREATE TYPE incident_status AS ENUM ('registrada', 'leída', 'atención', 'resuelta');
 CREATE TYPE school_level AS ENUM ('inicial', 'primaria', 'secundaria');
@@ -273,17 +233,17 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXEC
               <div className="space-y-2">
                 <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Rol Asignado</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {(['docente', 'supervisor', 'admin'] as const).map((role) => (
+                  {(['docente', 'secretaria', 'supervisor', 'admin'] as const).map((role) => (
                     <button
                       key={role}
                       type="button"
-                      onClick={() => setNewUser({ ...newUser, role })}
-                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all ${newUser.role === role
+                      onClick={() => setNewUser({ ...newUser, role: role as UserRole })}
+                      className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${newUser.role === role
                         ? 'border-brand-turquoise bg-brand-turquoise/10 text-brand-turquoise'
                         : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
                         }`}
                     >
-                      {role}
+                      {role === 'docente' ? 'Docente' : role === 'secretaria' ? 'Secretaria' : role === 'supervisor' ? 'Superv.' : 'Admin'}
                     </button>
                   ))}
                 </div>
@@ -366,12 +326,9 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXEC
               </div>
 
               <div className="mt-8 pt-8 border-t border-gray-50 flex items-center justify-between">
-                <button
-                  onClick={() => openEditUser(u)}
-                  className="text-brand-turquoise text-xs font-black uppercase tracking-widest hover:underline"
-                >
-                  Editar
-                </button>
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">
+                  Control Acceso
+                </div>
                 <button
                   onClick={() => handleToggleActive(u.id, u.active || false)}
                   className={`text-xs font-black uppercase tracking-widest ${u.active ? 'text-red-500 hover:underline' : 'text-emerald-500'}`}
@@ -384,96 +341,7 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXEC
         </div>
       )}
 
-      {/* Edit User Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="bg-gray-800 p-8 text-white flex justify-between items-center">
-              <h2 className="text-xl font-black flex items-center space-x-2 italic">
-                <UserPlus className="w-6 h-6 text-brand-turquoise" />
-                <span>Editar Perfil</span>
-              </h2>
-              <button onClick={() => setEditingUser(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
 
-            <form onSubmit={handleUpdateUser} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Nombre Completo</label>
-                <input
-                  required
-                  type="text"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all"
-                  value={editForm.full_name}
-                  onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Correo Electrónico</label>
-                <input
-                  required
-                  type="email"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all"
-                  value={editForm.email}
-                  onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Rol del Usuario</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(['docente', 'supervisor', 'admin'] as const).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => setEditForm({ ...editForm, role: role as UserRole })}
-                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all ${editForm.role === role
-                        ? 'border-brand-turquoise bg-brand-turquoise/10 text-brand-turquoise'
-                        : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
-                        }`}
-                    >
-                      {role}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">Nueva Contraseña (opcional)</label>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-100 bg-gray-50 focus:bg-white focus:border-brand-turquoise outline-none font-bold text-gray-700 transition-all"
-                  placeholder="Dejar en blanco para no cambiar"
-                  value={editForm.password}
-                  onChange={e => setEditForm({ ...editForm, password: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-2xl">
-                <input
-                  type="checkbox"
-                  id="user_active"
-                  className="w-5 h-5 rounded-lg border-gray-300 text-brand-turquoise focus:ring-brand-turquoise"
-                  checked={editForm.active}
-                  onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
-                />
-                <label htmlFor="user_active" className="text-sm font-bold text-gray-600 cursor-pointer">Usuario Activo</label>
-              </div>
-
-              <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-4 rounded-xl font-black text-xs uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
-                <button type="submit" disabled={isSaving} className="flex-1 py-4 rounded-xl font-black text-xs uppercase tracking-widest bg-gray-800 text-white hover:bg-gray-700 shadow-lg shadow-gray-800/20 transition-all flex items-center justify-center gap-2">
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 ml-1" />}
-                  <span>Guardar Cambios</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -16,13 +16,30 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
-        setError('Credenciales inválidas. Verifica tu correo y contraseña en el panel de Supabase.');
+        setError('Credenciales inválidas. Verifica tu correo y contraseña.');
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('active')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError || !profile?.active) {
+          await supabase.auth.signOut();
+          setError('No puede iniciar sesión en el sistema de incidencias porque su cuenta está desactivada.');
+          setLoading(false);
+          return;
+        }
       }
     } catch (err) {
       setError('Error de conexión con el servidor.');

@@ -36,7 +36,7 @@ const Reports: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<IncidentStatus>(IncidentStatus.REGISTRADA);
 
   // Date Filters
-  const [dateRangeType, setDateRangeType] = useState<'all' | '7days' | 'month' | 'year' | 'custom'>('all');
+  const [dateRangeType, setDateRangeType] = useState<'all' | 'today' | '7days' | 'month' | 'year' | 'custom'>('all');
   const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
@@ -96,18 +96,18 @@ const Reports: React.FC = () => {
       // Date Filtering
       if (dateRangeType !== 'all') {
         let startDate: Date | null = null;
-        if (dateRangeType === '7days') startDate = subDays(new Date(), 7);
+        if (dateRangeType === 'today') startDate = startOfDay(new Date());
+        else if (dateRangeType === '7days') startDate = subDays(new Date(), 7);
         else if (dateRangeType === 'month') startDate = startOfMonth(new Date());
         else if (dateRangeType === 'year') startDate = startOfYear(new Date());
-        else if (dateRangeType === 'custom') startDate = new Date(customStartDate);
+        else if (dateRangeType === 'custom') startDate = new Date(customStartDate + 'T00:00:00');
 
         if (startDate) {
           query = query.gte('incident_date', startDate.toISOString());
         }
 
         if (dateRangeType === 'custom' && customEndDate) {
-          const endDate = new Date(customEndDate);
-          endDate.setHours(23, 59, 59, 999);
+          const endDate = new Date(customEndDate + 'T23:59:59');
           query = query.lte('incident_date', endDate.toISOString());
         }
       }
@@ -119,14 +119,32 @@ const Reports: React.FC = () => {
       let results = data || [];
 
       if (activeReport === 'student' && studentSearch) {
-        results = results.filter(inc =>
-          inc.incident_participants?.some((p: any) =>
-            `${p.students?.first_name} ${p.students?.last_name}`.toLowerCase().includes(studentSearch.toLowerCase())
-          ) ||
-          inc.involved_students?.some((s: any) =>
-            `${s.names} ${s.lastNames}`.toLowerCase().includes(studentSearch.toLowerCase())
-          )
-        );
+        const searchLower = studentSearch.toLowerCase().trim();
+        results = results.filter(inc => {
+          // Buscar en participantes (tabla relacionada)
+          const hasParticipantMatch = inc.incident_participants?.some((p: any) => {
+            const student = p.students;
+            if (!student) return false;
+            const firstName = student.first_name || '';
+            const lastName = student.last_name || '';
+            const fullName = `${firstName} ${lastName}`.toLowerCase();
+            return fullName.includes(searchLower) ||
+              firstName.toLowerCase().includes(searchLower) ||
+              lastName.toLowerCase().includes(searchLower);
+          });
+
+          // Buscar en involved_students (campo JSONB heredado/respaldo)
+          const hasInvolvedMatch = inc.involved_students?.some((s: any) => {
+            const names = s.names || s.name || '';
+            const lastNames = s.lastNames || '';
+            const fullName = `${names} ${lastNames}`.toLowerCase();
+            return fullName.includes(searchLower) ||
+              names.toLowerCase().includes(searchLower) ||
+              lastNames.toLowerCase().includes(searchLower);
+          });
+
+          return hasParticipantMatch || hasInvolvedMatch;
+        });
       }
 
       setPreviewData(results);
@@ -177,7 +195,8 @@ const Reports: React.FC = () => {
       };
 
       let periodText = 'Periodo: Histórico Total';
-      if (dateRangeType === '7days') periodText = 'Periodo: Últimos 7 días';
+      if (dateRangeType === 'today') periodText = 'Periodo: Hoy';
+      else if (dateRangeType === '7days') periodText = 'Periodo: Últimos 7 días';
       else if (dateRangeType === 'month') periodText = 'Periodo: Este Mes';
       else if (dateRangeType === 'year') periodText = 'Periodo: Todo el Año';
       else if (dateRangeType === 'custom') periodText = `Periodo: ${format(new Date(customStartDate), 'dd/MM/yyyy')} al ${format(new Date(customEndDate), 'dd/MM/yyyy')}`;
@@ -192,7 +211,7 @@ const Reports: React.FC = () => {
         head: [['Código', 'Fecha', 'Alumno(s)', 'Conducta', 'Estado']],
         body: previewData.map(inc => [
           inc.correlative,
-          new Date(inc.incident_date).toLocaleDateString(),
+          new Date(inc.incident_date).toLocaleString(),
           inc.incident_participants?.length > 0
             ? inc.incident_participants.map((p: any) => `${p.students?.first_name} ${p.students?.last_name}`).join(', ')
             : inc.involved_students?.map((s: any) => `${s.names} ${s.lastNames}`).join(', ') || 'N/A',
@@ -255,6 +274,7 @@ const Reports: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {[
               { id: 'all', label: 'Todo' },
+              { id: 'today', label: 'Hoy' },
               { id: '7days', label: '7 días' },
               { id: 'month', label: 'Este Mes' },
               { id: 'year', label: 'Año' },
@@ -437,7 +457,7 @@ const Reports: React.FC = () => {
                   previewData.map((inc) => (
                     <tr key={inc.id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="px-6 py-5 font-black text-indigo-600 text-sm">{inc.correlative}</td>
-                      <td className="px-6 py-5 font-bold text-gray-700 text-sm">{new Date(inc.incident_date).toLocaleDateString()}</td>
+                      <td className="px-6 py-5 font-bold text-gray-700 text-sm">{new Date(inc.incident_date).toLocaleString()}</td>
                       <td className="px-6 py-5">
                         <div className="space-y-1">
                           {inc.incident_participants && inc.incident_participants.length > 0 ? (
@@ -464,8 +484,9 @@ const Reports: React.FC = () => {
                       </td>
                       <td className="px-6 py-5 text-center">
                         <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${inc.status === 'resuelta' ? 'bg-emerald-100 text-emerald-600' :
-                          inc.status === 'atención' ? 'bg-amber-100 text-amber-600' :
-                            'bg-indigo-100 text-indigo-600'
+                            inc.status === 'atención' ? 'bg-amber-100 text-amber-600' :
+                              inc.status === 'leída' ? 'bg-blue-100 text-blue-600' :
+                                'bg-gray-100 text-gray-500' // 'registrada' o default
                           }`}>
                           {inc.status}
                         </span>

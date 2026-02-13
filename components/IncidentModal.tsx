@@ -126,7 +126,7 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
         grade: formData.type === IncidentType.ESTUDIANTE ? formData.grade : null,
         section: formData.type === IncidentType.ESTUDIANTE ? formData.section : null,
         room_name: formData.type === IncidentType.GENERAL ? formData.room_name : null,
-        incident_date: formData.incidentDate,
+        incident_date: new Date(formData.incidentDate).toISOString(),
         description: formData.description,
         teacher_id: user.id,
         category_id: formData.categoryId === 'other' ? null : parseInt(formData.categoryId),
