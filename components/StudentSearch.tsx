@@ -31,7 +31,7 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ onSelect, onClose, classI
         try {
             let q = supabase
                 .from('students')
-                .select('*')
+                .select('*, classrooms:classroom_id(level, grade, section)')
                 .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
                 .not('classroom_id', 'is', null);
 
@@ -39,7 +39,7 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ onSelect, onClose, classI
                 q = q.eq('classroom_id', classId);
             }
 
-            const { data, error } = await q.limit(10);
+            const { data, error } = await q.limit(15);
 
             if (error) throw error;
             setResults(data || []);
@@ -47,6 +47,15 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ onSelect, onClose, classI
             console.error('Error searching students:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const getLevelLabel = (level: string) => {
+        switch (level) {
+            case 'Inicial': return 'INI';
+            case 'Primaria': return 'PRI';
+            case 'Secundaria': return 'SEC';
+            default: return level;
         }
     };
 
@@ -78,6 +87,12 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ onSelect, onClose, classI
                         {loading && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-turquoise animate-spin" />}
                     </div>
 
+                    {!classId && (
+                        <p className="text-[10px] font-black text-brand-turquoise uppercase tracking-widest text-center">
+                            Búsqueda en todos los matriculados
+                        </p>
+                    )}
+
                     <div className="max-h-[300px] overflow-y-auto space-y-2 custom-scrollbar pr-1">
                         {results.length > 0 ? (
                             results.map((student) => (
@@ -96,6 +111,11 @@ const StudentSearch: React.FC<StudentSearchProps> = ({ onSelect, onClose, classI
                                         <p className="font-black text-gray-800 leading-tight">
                                             {student.first_name} {student.last_name}
                                         </p>
+                                        {student.classrooms && (
+                                            <p className="text-[10px] font-bold text-gray-400 mt-0.5">
+                                                {getLevelLabel(student.classrooms.level)} • {student.classrooms.grade}° "{student.classrooms.section}"
+                                            </p>
+                                        )}
                                     </div>
                                     <Check className="w-5 h-5 text-brand-turquoise opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </button>

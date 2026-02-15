@@ -438,7 +438,6 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
           <StudentSearch
             onClose={() => setIsSearchingStudent(false)}
             onSelect={(student) => handleSelectStudent(searchingStudentIndex, student)}
-            classId={formData.classId}
           />
         )}
       </div>

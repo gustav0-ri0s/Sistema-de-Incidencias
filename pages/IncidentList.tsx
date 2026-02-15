@@ -50,8 +50,10 @@ const IncidentList: React.FC = () => {
   }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
   useEffect(() => {
-    fetchIncidents();
-  }, [statusFilter]);
+    if (user) fetchIncidents();
+  }, [statusFilter, user]);
+
+  const isAdminOrSupervisor = user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN;
 
   const fetchIncidents = async () => {
     setLoading(true);
@@ -72,6 +74,11 @@ const IncidentList: React.FC = () => {
         )
       `)
       .order('created_at', { ascending: false });
+
+    // Docentes only see their own incidents
+    if (!isAdminOrSupervisor) {
+      query = query.eq('teacher_id', user?.id);
+    }
 
     if (statusFilter !== 'all') {
       query = query.eq('status', statusFilter);

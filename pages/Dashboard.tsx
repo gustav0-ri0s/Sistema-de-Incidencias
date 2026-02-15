@@ -19,19 +19,21 @@ import {
   FileText,
   AlertTriangle,
   CheckCircle2,
-  TrendingUp,
+  CalendarDays,
   Calendar,
   ArrowRight
 } from 'lucide-react';
 import IncidentModal from '../components/IncidentModal';
-import { IncidentStatus, IncidentType } from '../types';
+import { IncidentStatus, IncidentType, UserRole } from '../types';
 
 const Dashboard: React.FC = () => {
   const { user } = useContext(AuthContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [counts, setCounts] = useState({ total: 0, pending: 0, resolved: 0, efficiency: 0 });
+  const [counts, setCounts] = useState({ total: 0, pending: 0, resolved: 0, thisMonth: 0 });
   const [pieData, setPieData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isAdminOrSupervisor = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR;
 
   useEffect(() => {
     if (user) fetchDashboardStats();
@@ -39,26 +41,56 @@ const Dashboard: React.FC = () => {
 
   const fetchDashboardStats = async () => {
     setLoading(true);
-    // 1. Conteo total del docente
-    const { count: total } = await supabase
-      .from('incidents')
-      .select('*', { count: 'exact', head: true })
-      .eq('teacher_id', user?.id);
 
-    // 2. Pendientes (Todas menos Resuelta)
-    const { count: pending } = await supabase
+    // Build base queries - docentes only see their own, admin/supervisor see all
+    // 1. Total incidents
+    let totalQuery = supabase
+      .from('incidents')
+      .select('*', { count: 'exact', head: true });
+    if (!isAdminOrSupervisor) {
+      totalQuery = totalQuery.eq('teacher_id', user?.id);
+    }
+    const { count: total } = await totalQuery;
+
+    // 2. Pending (all except Resuelta)
+    let pendingQuery = supabase
       .from('incidents')
       .select('*', { count: 'exact', head: true })
       .neq('status', IncidentStatus.RESUELTA);
+    if (!isAdminOrSupervisor) {
+      pendingQuery = pendingQuery.eq('teacher_id', user?.id);
+    }
+    const { count: pending } = await pendingQuery;
 
-    // 3. Resueltas
-    const { count: resolved } = await supabase
+    // 3. Resolved
+    let resolvedQuery = supabase
       .from('incidents')
       .select('*', { count: 'exact', head: true })
       .eq('status', IncidentStatus.RESUELTA);
+    if (!isAdminOrSupervisor) {
+      resolvedQuery = resolvedQuery.eq('teacher_id', user?.id);
+    }
+    const { count: resolved } = await resolvedQuery;
 
-    // 4. Distribución para PieChart
-    const { data: allData } = await supabase.from('incidents').select('type');
+    // 4. This month
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    let monthQuery = supabase
+      .from('incidents')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', firstDayOfMonth);
+    if (!isAdminOrSupervisor) {
+      monthQuery = monthQuery.eq('teacher_id', user?.id);
+    }
+    const { count: thisMonth } = await monthQuery;
+
+    // 5. Distribution for PieChart
+    let pieQuery = supabase.from('incidents').select('type');
+    if (!isAdminOrSupervisor) {
+      pieQuery = pieQuery.eq('teacher_id', user?.id);
+    }
+    const { data: allData } = await pieQuery;
+
     if (allData) {
       const distribution = allData.reduce((acc: any, curr: any) => {
         acc[curr.type] = (acc[curr.type] || 0) + 1;
@@ -77,16 +109,18 @@ const Dashboard: React.FC = () => {
       total: total || 0,
       pending: pending || 0,
       resolved: resolved || 0,
-      efficiency: total ? Math.round(((resolved || 0) / (total || 1)) * 100) : 0
+      thisMonth: thisMonth || 0
     });
     setLoading(false);
   };
 
+  const monthName = new Date().toLocaleDateString('es-ES', { month: 'long' });
+
   const stats = [
-    { label: 'Mis Registros', value: counts.total.toString(), icon: <FileText className="text-brand-turquoise" />, color: 'bg-brand-light' },
+    { label: isAdminOrSupervisor ? 'Total Registros' : 'Mis Registros', value: counts.total.toString(), icon: <FileText className="text-brand-turquoise" />, color: 'bg-brand-light' },
     { label: 'Pendientes', value: counts.pending.toString(), icon: <AlertTriangle className="text-amber-500" />, color: 'bg-amber-50' },
     { label: 'Cerradas', value: counts.resolved.toString(), icon: <CheckCircle2 className="text-emerald-500" />, color: 'bg-emerald-50' },
-    { label: 'Resolución', value: `${counts.efficiency}%`, icon: <TrendingUp className="text-blue-500" />, color: 'bg-blue-50' },
+    { label: `Este Mes`, value: counts.thisMonth.toString(), icon: <CalendarDays className="text-violet-500" />, color: 'bg-violet-50', subtitle: monthName.charAt(0).toUpperCase() + monthName.slice(1) },
   ];
 
   return (
@@ -120,6 +154,9 @@ const Dashboard: React.FC = () => {
             <div>
               <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{stat.label}</p>
               <p className="text-3xl font-black text-gray-800 mt-1">{loading ? '...' : stat.value}</p>
+              {'subtitle' in stat && stat.subtitle && (
+                <p className="text-[10px] font-bold text-violet-400 uppercase tracking-wider mt-0.5">{stat.subtitle}</p>
+              )}
             </div>
           </div>
         ))}
