@@ -35,8 +35,7 @@ const Login: React.FC = () => {
           .single();
 
         if (profileError || !profile?.active) {
-          await supabase.auth.signOut();
-          setError('No puede iniciar sesión en el sistema de incidencias porque su cuenta está desactivada.');
+          // No hacemos signOut aquí para permitir que App.tsx muestre el modal premium
           setLoading(false);
           return;
         }
