@@ -9,6 +9,7 @@ import {
   LogOut,
   FileBarChart,
   MapPin,
+  Home,
   X
 } from 'lucide-react';
 import { AuthContext } from '../App';
@@ -88,10 +89,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           ))}
         </nav>
 
-        <div className="p-6 border-t border-gray-50">
+        <div className="p-6 border-t border-gray-50 space-y-2">
+          <button
+            onClick={() => window.location.href = import.meta.env.VITE_PORTAL_URL || '/'}
+            className="w-full flex items-center gap-3 px-6 py-4 text-slate-400 hover:text-brand-celeste rounded-2xl transition-all hover:bg-slate-50 border border-transparent hover:border-slate-100 group"
+          >
+            <Home size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="font-bold text-sm">Volver al Portal</span>
+          </button>
+
           <button
             onClick={logout}
-            className="flex items-center space-x-4 px-4 py-3.5 w-full rounded-2xl font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+            className="flex items-center space-x-4 px-4 py-3.5 w-full rounded-2xl font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all border border-transparent"
           >
             <LogOut className="w-5 h-5" />
             <span>Cerrar Sesión</span>
