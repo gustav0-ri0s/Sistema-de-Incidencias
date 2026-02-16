@@ -90,11 +90,11 @@ const App: React.FC = () => {
   );
 
   const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="flex min-h-screen bg-brand-light relative">
+    <div className="flex h-screen bg-brand-light relative overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full">
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="p-4 md:p-8 flex-1 overflow-auto">
+        <main className="p-4 md:p-8 flex-1 overflow-auto custom-scrollbar">
           {children}
         </main>
         <footer className="p-6 text-center border-t border-gray-100 bg-white/50 backdrop-blur-sm">
