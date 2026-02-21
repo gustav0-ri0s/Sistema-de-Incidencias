@@ -276,8 +276,8 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
                       required
                     >
                       <option value="">Seleccionar Grado</option>
-                      {[...new Set(classrooms.filter(c => c.level === formData.level).map(c => c.grade))].map(g => (
-                        <option key={g} value={g}>{g}</option>
+                      {[...new Set(classrooms.filter(c => c.level === formData.level).map(c => c.grade as string))].map((g: string) => (
+                        <option key={g} value={g}>{g.startsWith('Ciclo') ? `Inglés - ${g}` : g}</option>
                       ))}
                     </select>
 
