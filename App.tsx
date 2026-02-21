@@ -14,6 +14,10 @@ import Header from './components/Header';
 import RequireAuth from './components/RequireAuth';
 import { supabase } from './supabase';
 
+const IDLE_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in ms
+const CHECK_INTERVAL = 60 * 1000; // 1 minute in ms
+const ACTIVITY_KEY = 'vc_last_activity';
+
 export const AuthContext = React.createContext<{
   user: Profile | null;
   loading: boolean;
@@ -37,6 +41,7 @@ const App: React.FC = () => {
     let mounted = true;
 
     async function handleSession(session: any) {
+      if (!mounted) return;
       if (session?.user) {
         try {
           const { data: profile } = await supabase
@@ -50,6 +55,7 @@ const App: React.FC = () => {
           }
         } catch (err) {
           console.error('Profile fetch exception:', err);
+          handleLogout();
         }
       } else {
         if (mounted) {
@@ -76,9 +82,54 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Idle Timeout Logic
+  useEffect(() => {
+    if (!user) return;
+
+    const checkIdleTimeout = () => {
+      const lastActivity = localStorage.getItem(ACTIVITY_KEY);
+      if (lastActivity) {
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+        if (timeSinceLastActivity > IDLE_TIMEOUT) {
+          console.warn('Idle timeout reached, signing out...');
+          handleLogout();
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (checkIdleTimeout()) return;
+
+    const updateActivity = () => {
+      localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
+    };
+
+    updateActivity();
+
+    const events = ['mousedown', 'keydown', 'mousemove', 'scroll', 'touchstart'];
+    events.forEach(eventName => {
+      window.addEventListener(eventName, updateActivity);
+    });
+
+    const interval = setInterval(checkIdleTimeout, CHECK_INTERVAL);
+
+    return () => {
+      events.forEach(eventName => {
+        window.removeEventListener(eventName, updateActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [user]);
+
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error during signOut:', err);
+    }
     setUser(null);
+    localStorage.removeItem(ACTIVITY_KEY);
     window.location.href = import.meta.env.VITE_PORTAL_URL || 'https://portal-vc-academico.vercel.app';
   };
 
