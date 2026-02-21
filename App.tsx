@@ -28,7 +28,7 @@ export const AuthContext = React.createContext<{
   logout: () => { }
 });
 
-const ALL_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.DOCENTE, UserRole.SECRETARIA];
+const ALL_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.DOCENTE, UserRole.DOCENTE_INGLES, UserRole.SECRETARIA];
 const SUPERVISOR_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR];
 const ADMIN_ROLES = [UserRole.ADMIN];
 
