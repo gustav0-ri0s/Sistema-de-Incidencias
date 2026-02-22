@@ -26,7 +26,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({ children, allowedRoles }) => 
                 if (!session) {
                     if (isMounted) {
                         const currentUrl = window.location.origin + location.pathname + location.search;
-                        window.location.href = `${import.meta.env.VITE_PORTAL_URL}/login?returnTo=${encodeURIComponent(currentUrl)}`;
+                        window.location.href = `${import.meta.env.VITE_PORTAL_URL}?view=login&returnTo=${encodeURIComponent(currentUrl)}`;
                     }
                     return;
                 }
@@ -70,7 +70,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({ children, allowedRoles }) => 
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        window.location.href = import.meta.env.VITE_PORTAL_URL;
+        window.location.href = `${import.meta.env.VITE_PORTAL_URL}?view=login`;
     };
 
     if (loading) {
