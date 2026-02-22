@@ -431,9 +431,16 @@ const IncidentList: React.FC = () => {
                       <span className="text-sm font-bold text-gray-700">{new Date(incident.incident_date).toLocaleDateString('es-ES')}</span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className={`inline-flex items-center px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 ${getStatusStyle(incident.status)}`}>
-                        {incident.status}
-                      </span>
+                      <div className="flex flex-col space-y-1.5">
+                        <span className={`inline-flex items-center self-start px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 ${getStatusStyle(incident.status)}`}>
+                          {incident.status}
+                        </span>
+                        {incident.resolution_details && (
+                          <p className="text-[11px] text-gray-500 font-medium line-clamp-1 max-w-[200px]" title={incident.resolution_details}>
+                            {incident.resolution_details}
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end space-x-2">

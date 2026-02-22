@@ -406,6 +406,7 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
                 </div>
               )}
 
+              {/* Temporalmente oculto: opción de adjuntar evidencia (fotografía)
               <div className="p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center"><ImageIcon className="w-4 h-4 mr-2" /> Evidencia</label>
@@ -416,6 +417,7 @@ const IncidentModal: React.FC<IncidentModalProps> = ({ isOpen, onClose }) => {
                 </div>
                 {formData.imageUrl && <img src={formData.imageUrl} className="w-full rounded-2xl border border-gray-100" alt="Preview" />}
               </div>
+              */}
 
               <div className="space-y-6">
                 <div className="space-y-2">
