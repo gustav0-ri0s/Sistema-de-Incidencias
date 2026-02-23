@@ -16,7 +16,7 @@ import { supabase } from './supabase';
 
 const IDLE_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in ms
 const CHECK_INTERVAL = 60 * 1000; // 1 minute in ms
-const ACTIVITY_KEY = 'vc_last_activity';
+const getActivityKey = (userId: string) => `vc_last_activity_${userId}`;
 
 export const AuthContext = React.createContext<{
   user: Profile | null;
@@ -86,6 +86,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
+    const ACTIVITY_KEY = getActivityKey(user.id);
+
     const checkIdleTimeout = () => {
       const lastActivity = localStorage.getItem(ACTIVITY_KEY);
       if (lastActivity) {
@@ -128,8 +130,10 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Error during signOut:', err);
     }
+    if (user) {
+      localStorage.removeItem(getActivityKey(user.id));
+    }
     setUser(null);
-    localStorage.removeItem(ACTIVITY_KEY);
     const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://portal-vc-academico.vercel.app';
     window.location.href = `${portalUrl}?view=login`;
   };
