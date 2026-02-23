@@ -40,6 +40,7 @@ const UserManager: React.FC = () => {
       case UserRole.ADMIN: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-[10px] font-black uppercase"><ShieldAlert className="w-3 h-3" /><span>Admin</span></div>;
       case UserRole.SUPERVISOR: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black uppercase"><ShieldCheck className="w-3 h-3" /><span>Supervisor</span></div>;
       case UserRole.SECRETARIA: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black uppercase"><ShieldCheck className="w-3 h-3" /><span>Secretaria</span></div>;
+      case UserRole.PSICOLOGA: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-pink-100 text-pink-700 rounded-full text-[10px] font-black uppercase"><ShieldCheck className="w-3 h-3" /><span>Psicología</span></div>;
       default: return <div className="flex items-center space-x-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-[10px] font-black uppercase"><Shield className="w-3 h-3" /><span>Docente</span></div>;
     }
   };
