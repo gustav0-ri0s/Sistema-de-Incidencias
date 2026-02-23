@@ -4,7 +4,8 @@ export enum UserRole {
   DOCENTE_INGLES = 'docente_ingles',
   SECRETARIA = 'secretaria',
   SUPERVISOR = 'supervisor',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  PSICOLOGA = 'psicologa'
 }
 
 export enum IncidentType {

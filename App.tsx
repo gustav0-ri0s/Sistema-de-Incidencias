@@ -28,8 +28,8 @@ export const AuthContext = React.createContext<{
   logout: () => { }
 });
 
-const ALL_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.DOCENTE, UserRole.DOCENTE_INGLES, UserRole.SECRETARIA];
-const SUPERVISOR_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR];
+const ALL_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.DOCENTE, UserRole.DOCENTE_INGLES, UserRole.SECRETARIA, UserRole.PSICOLOGA];
+const SUPERVISOR_ROLES = [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.PSICOLOGA];
 const ADMIN_ROLES = [UserRole.ADMIN];
 
 const App: React.FC = () => {

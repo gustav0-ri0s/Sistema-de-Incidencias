@@ -53,7 +53,7 @@ const IncidentList: React.FC = () => {
     if (user) fetchIncidents();
   }, [statusFilter, user]);
 
-  const isAdminOrSupervisor = user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN;
+  const isAdminOrSupervisor = user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA;
 
   const fetchIncidents = async () => {
     setLoading(true);
@@ -143,7 +143,7 @@ const IncidentList: React.FC = () => {
   };
 
   const handleOpenDetail = async (incident: Incident) => {
-    if (incident.status === IncidentStatus.REGISTRADA && (user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN)) {
+    if (incident.status === IncidentStatus.REGISTRADA && (user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA)) {
       await updateStatus(incident.id, IncidentStatus.LEIDA);
     }
     setSelectedIncident(incident);
@@ -494,7 +494,7 @@ const IncidentList: React.FC = () => {
                   </div>
                 </div>
 
-                {(user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN) && (
+                {(user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA) && (
                   <div className="flex flex-wrap justify-center gap-3">
                     {selectedIncident.status === IncidentStatus.RESUELTA && user?.role === UserRole.ADMIN && (
                       <button
@@ -677,7 +677,7 @@ const IncidentList: React.FC = () => {
                               <span className="text-[10px] font-bold text-brand-turquoise bg-brand-turquoise/5 px-3 py-1 rounded-full">
                                 Por: {log.profiles?.full_name || 'Personal Autorizado'}
                               </span>
-                              {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR) && (
+                              {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR || user?.role === UserRole.PSICOLOGA) && (
                                 <div className="flex items-center border-l pl-2 border-gray-200 ml-1 space-x-1">
                                   <button
                                     onClick={() => setEditingLogId(log.id)}

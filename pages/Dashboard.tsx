@@ -36,7 +36,7 @@ const Dashboard: React.FC = () => {
   const [statusChartData, setStatusChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isAdminOrSupervisor = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR;
+  const isAdminOrSupervisor = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR || user?.role === UserRole.PSICOLOGA;
 
   useEffect(() => {
     if (user) fetchDashboardStats();

@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { to: '/incidencias', icon: <ClipboardList className="w-5 h-5" />, label: 'Incidencias' },
   ];
 
-  if (user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN) {
+  if (user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA) {
     navItems.push(
       { to: '/reportes', icon: <FileBarChart className="w-5 h-5" />, label: 'Reportes' }
     );
