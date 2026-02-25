@@ -102,6 +102,11 @@ CREATE POLICY "Actualizar Incidencias" ON incidents FOR UPDATE
 TO authenticated 
 USING ((SELECT role FROM profiles WHERE id = auth.uid()) IN ('supervisor', 'admin'));
 
+DROP POLICY IF EXISTS "Eliminar Incidencias" ON incidents;
+CREATE POLICY "Eliminar Incidencias" ON incidents FOR DELETE
+TO authenticated
+USING ((SELECT role FROM profiles WHERE id = auth.uid()) IN ('supervisor', 'admin'));
+
 -- 5. SEED DATA (Categorías iniciales)
 INSERT INTO incident_categories (name) VALUES 
 ('Conducta Inapropiada'),
