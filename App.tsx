@@ -88,6 +88,13 @@ const App: React.FC = () => {
 
     const ACTIVITY_KEY = getActivityKey(user.id);
 
+    const updateActivity = () => {
+      localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
+    };
+
+    // Update activity immediately on load so we don't log out from an old module session
+    updateActivity();
+
     const checkIdleTimeout = () => {
       const lastActivity = localStorage.getItem(ACTIVITY_KEY);
       if (lastActivity) {
@@ -100,14 +107,6 @@ const App: React.FC = () => {
       }
       return false;
     };
-
-    if (checkIdleTimeout()) return;
-
-    const updateActivity = () => {
-      localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
-    };
-
-    updateActivity();
 
     const events = ['mousedown', 'keydown', 'mousemove', 'scroll', 'touchstart'];
     events.forEach(eventName => {
