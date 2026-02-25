@@ -220,6 +220,35 @@ const IncidentList: React.FC = () => {
     });
   };
 
+  const handleDeleteIncident = async (incidentId: string) => {
+    setConfirmModal(prev => ({ ...prev, isLoading: true }));
+
+    const { error } = await supabase
+      .from('incidents')
+      .delete()
+      .eq('id', incidentId);
+
+    if (error) {
+      console.error(error);
+      alert("Error al eliminar la incidencia.");
+      setConfirmModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+      return;
+    }
+
+    fetchIncidents();
+    setConfirmModal(prev => ({ ...prev, isOpen: false, isLoading: false }));
+  };
+
+  const openDeleteIncidentConfirm = (incidentId: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar Incidencia',
+      message: '¿Está seguro de eliminar toda la incidencia permanentemente? Perderá todos los registros y la evidencia asociada.',
+      type: 'danger',
+      onConfirm: () => handleDeleteIncident(incidentId)
+    });
+  };
+
   const handleUpdateLog = async (logId: string, newComment: string) => {
     if (!newComment.trim()) return;
 
@@ -447,9 +476,19 @@ const IncidentList: React.FC = () => {
                         <button
                           onClick={() => handleOpenDetail(incident)}
                           className="p-3 text-brand-turquoise hover:bg-brand-turquoise/10 rounded-2xl transition-all"
+                          title="Ver detalle"
                         >
                           <Eye className="w-7 h-7" />
                         </button>
+                        {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR) && (
+                          <button
+                            onClick={() => openDeleteIncidentConfirm(incident.id)}
+                            className="p-3 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"
+                            title="Eliminar incidencia"
+                          >
+                            <Trash2 className="w-7 h-7" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
