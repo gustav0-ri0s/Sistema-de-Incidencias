@@ -39,6 +39,9 @@ const IncidentList: React.FC = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [tempStatus, setTempStatus] = useState<IncidentStatus | null>(null);
   const [resolutionDetails, setResolutionDetails] = useState('');
+  const [suggestPsychAttention, setSuggestPsychAttention] = useState(false);
+  const [isSendingPsych, setIsSendingPsych] = useState(false);
+  const [psychSuggestionSent, setPsychSuggestionSent] = useState(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -89,7 +92,7 @@ const IncidentList: React.FC = () => {
     setLoading(false);
   };
 
-  const updateStatus = async (id: string, newStatus: IncidentStatus, details?: string) => {
+  const updateStatus = async (id: string, newStatus: IncidentStatus, details?: string, withPsychSuggestion?: boolean) => {
     const currentIncident = incidents.find(i => i.id === id);
     if (currentIncident?.status === IncidentStatus.RESUELTA && user?.role !== UserRole.ADMIN) {
       alert("Solo el administrador puede revertir una incidencia ya resuelta.");
@@ -117,11 +120,37 @@ const IncidentList: React.FC = () => {
         });
       }
 
+      // If psychological attention was suggested, create a suggestion
+      if (withPsychSuggestion && user && selectedIncident) {
+        const participants = selectedIncident.incident_participants || [];
+        const studentName = participants.length > 0
+          ? `${participants[0].students?.first_name} ${participants[0].students?.last_name}`
+          : (selectedIncident.involved_students && selectedIncident.involved_students.length > 0
+            ? `${selectedIncident.involved_students[0].names} ${selectedIncident.involved_students[0].lastNames}`
+            : 'Estudiante involucrado');
+
+        const studentGrade = selectedIncident.classrooms
+          ? `${selectedIncident.classrooms.grade} "${selectedIncident.classrooms.section}" ${selectedIncident.classrooms.level}`
+          : '';
+
+        await supabase.from('psych_appointment_suggestions').insert({
+          incident_id: id,
+          incident_correlative: selectedIncident.correlative,
+          student_name: studentName,
+          student_grade: studentGrade,
+          suggested_by: user.id,
+          suggested_by_name: user.full_name,
+          reason: details || 'Sugerido desde incidencia',
+          status: 'pending'
+        });
+      }
+
       // Refresh incidents to get the latest logs
       fetchIncidents();
 
       setTempStatus(null);
       setResolutionDetails('');
+      setSuggestPsychAttention(false);
 
       // Update selected incident if it's the one being modified
       if (selectedIncident?.id === id) {
@@ -147,6 +176,41 @@ const IncidentList: React.FC = () => {
       await updateStatus(incident.id, IncidentStatus.LEIDA);
     }
     setSelectedIncident(incident);
+    setPsychSuggestionSent(false);
+    setSuggestPsychAttention(false);
+  };
+
+  const handleSendPsychSuggestion = async () => {
+    if (!selectedIncident || !user) return;
+    setIsSendingPsych(true);
+
+    const participants = selectedIncident.incident_participants || [];
+    const studentName = participants.length > 0
+      ? `${participants[0].students?.first_name} ${participants[0].students?.last_name}`
+      : (selectedIncident.involved_students && selectedIncident.involved_students.length > 0
+        ? `${selectedIncident.involved_students[0].names} ${selectedIncident.involved_students[0].lastNames}`
+        : 'Estudiante involucrado');
+
+    const studentGrade = selectedIncident.classrooms
+      ? `${selectedIncident.classrooms.grade} "${selectedIncident.classrooms.section}" - ${selectedIncident.classrooms.level}`
+      : '';
+
+    const { error } = await supabase.from('psych_appointment_suggestions').insert({
+      incident_id: selectedIncident.id,
+      incident_correlative: selectedIncident.correlative,
+      student_name: studentName,
+      student_grade: studentGrade,
+      suggested_by: user.id,
+      suggested_by_name: user.full_name,
+      reason: selectedIncident.description,
+      status: 'pending'
+    });
+
+    setIsSendingPsych(false);
+    if (!error) {
+      setPsychSuggestionSent(true);
+      setSuggestPsychAttention(false);
+    }
   };
 
   const handleDeleteLog = async (logId: string) => {
@@ -551,6 +615,7 @@ const IncidentList: React.FC = () => {
                           onClick={() => {
                             setTempStatus(IncidentStatus.ATENCION);
                             setResolutionDetails('');
+                            setSuggestPsychAttention(false);
                           }}
                           className={`px-5 py-3 text-[10px] font-black uppercase rounded-2xl transition-all shadow-md flex items-center space-x-2 ${selectedIncident.status === IncidentStatus.ATENCION ? 'bg-amber-500 text-white' : 'bg-white text-amber-600 hover:bg-amber-50 border border-amber-100'
                             }`}
@@ -562,6 +627,7 @@ const IncidentList: React.FC = () => {
                           onClick={() => {
                             setTempStatus(IncidentStatus.RESUELTA);
                             setResolutionDetails('');
+                            setSuggestPsychAttention(false);
                           }}
                           className="px-5 py-3 bg-emerald-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/30 flex items-center space-x-2"
                         >
@@ -589,11 +655,14 @@ const IncidentList: React.FC = () => {
                           onChange={(e) => setResolutionDetails(e.target.value)}
                           required
                         />
+
+
                         <div className="flex justify-end space-x-3">
                           <button
                             onClick={() => {
                               setTempStatus(null);
                               setResolutionDetails('');
+                              setSuggestPsychAttention(false);
                             }}
                             className="px-6 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest"
                           >
@@ -606,7 +675,7 @@ const IncidentList: React.FC = () => {
                                 return;
                               }
                               setIsUpdatingStatus(true);
-                              await updateStatus(selectedIncident.id, tempStatus, resolutionDetails);
+                              await updateStatus(selectedIncident.id, tempStatus, resolutionDetails, suggestPsychAttention);
                               setIsUpdatingStatus(false);
                             }}
                             disabled={isUpdatingStatus}
@@ -620,6 +689,88 @@ const IncidentList: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* === PSYCH SUGGESTION PANEL - independent, always visible for supervisor/admin on student incidents === */}
+              {(user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN) && selectedIncident.type === IncidentType.ESTUDIANTE && (
+                <div className={`rounded-3xl border-2 p-5 transition-all ${psychSuggestionSent
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-violet-50 border-violet-200'
+                  }`}>
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-2xl shrink-0 ${psychSuggestionSent ? 'bg-green-100 text-green-600' : 'bg-violet-100 text-violet-600'
+                      }`}>
+                      {psychSuggestionSent ? (
+                        <CheckCircle className="w-6 h-6" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      {psychSuggestionSent ? (
+                        <>
+                          <p className="text-sm font-black text-green-800">¡Sugerencia enviada a Psicología!</p>
+                          <p className="text-[11px] text-green-600 font-medium mt-0.5">La psicóloga recibirá una alerta y podrá agendar una cita con el/los estudiante(s).</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-black text-violet-800">Sugerir Atención Psicológica</p>
+                          <p className="text-[11px] text-violet-600 font-medium mt-0.5">Notifica a la psicóloga para que pueda agendar una cita con el/los estudiante(s) involucrado(s).</p>
+                          <label className="flex items-center gap-2 mt-3 cursor-pointer select-none group w-fit">
+                            <div className="relative flex items-center justify-center">
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={suggestPsychAttention}
+                                onChange={(e) => setSuggestPsychAttention(e.target.checked)}
+                              />
+                              <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${suggestPsychAttention
+                                  ? 'bg-violet-600 border-violet-600'
+                                  : 'bg-white border-violet-300 group-hover:border-violet-500'
+                                }`}>
+                                {suggestPsychAttention && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-black text-violet-700 uppercase tracking-wider">Marcar para sugerir atención psicológica</span>
+                          </label>
+                        </>
+                      )}
+                    </div>
+                    {!psychSuggestionSent && (
+                      <button
+                        onClick={handleSendPsychSuggestion}
+                        disabled={!suggestPsychAttention || isSendingPsych}
+                        className={`shrink-0 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${suggestPsychAttention && !isSendingPsych
+                            ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-600/30'
+                            : 'bg-violet-100 text-violet-300 cursor-not-allowed'
+                          }`}
+                      >
+                        {isSendingPsych ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                            Enviar
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div className="space-y-8">
