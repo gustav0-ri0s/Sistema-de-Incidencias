@@ -180,7 +180,28 @@ const IncidentList: React.FC = () => {
     if (incident.status === IncidentStatus.REGISTRADA && (user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA)) {
       await updateStatus(incident.id, IncidentStatus.LEIDA);
     }
-    setSelectedIncident(incident);
+
+    // Siempre traer datos frescos desde la BD para mostrar la última versión (incluye ediciones del docente)
+    const { data: freshIncident } = await supabase
+      .from('incidents')
+      .select(`
+        *,
+        profiles:teacher_id (full_name),
+        incident_categories:category_id (name),
+        classrooms:classroom_id (level, grade, section),
+        incident_participants (
+          role,
+          students (first_name, last_name)
+        ),
+        incident_logs (
+          *,
+          profiles:created_by (full_name)
+        )
+      `)
+      .eq('id', incident.id)
+      .single();
+
+    setSelectedIncident((freshIncident as Incident) ?? incident);
     setPsychSuggestionSent(false);
     setSuggestPsychAttention(false);
   };
