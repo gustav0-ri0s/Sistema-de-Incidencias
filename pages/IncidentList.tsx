@@ -404,83 +404,202 @@ const IncidentList: React.FC = () => {
   };
 
   const generatePDF = (incident: Incident) => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    // ── Constantes de layout ──────────────────────────────────────────────
+    const pageW = doc.internal.pageSize.getWidth();   // 210 mm
+    const pageH = doc.internal.pageSize.getHeight();  // 297 mm
+    const marginL = 18;
+    const marginR = 18;
+    const marginB = 20;
+    const contentW = pageW - marginL - marginR;          // ~174 mm
+
+    let y = 0;
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    const checkPage = (needed: number) => {
+      if (y + needed > pageH - marginB) {
+        doc.addPage();
+        y = 15;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(180, 180, 180);
+        doc.text(`${incident.correlative} — continuación`, pageW - marginR, y, { align: 'right' });
+        doc.setTextColor(55, 65, 81);
+        y += 8;
+      }
+    };
+
+    const printWrapped = (
+      text: string,
+      x: number,
+      maxW: number,
+      fontSize: number,
+      fontStyle: 'normal' | 'bold' | 'italic',
+      lh: number
+    ) => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', fontStyle);
+      const lines: string[] = doc.splitTextToSize(text, maxW);
+      lines.forEach((line: string) => {
+        checkPage(lh);
+        doc.text(line, x, y);
+        y += lh;
+      });
+    };
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ENCABEZADO
+    // ══════════════════════════════════════════════════════════════════════
     doc.setFillColor(91, 201, 213);
-    doc.rect(0, 0, pageWidth, 45, 'F');
+    doc.rect(0, 0, pageW, 42, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('I.E.P. VALORES Y CIENCIAS', pageWidth / 2, 22, { align: 'center' });
-    doc.setFontSize(14);
-    doc.text('REPORTE OFICIAL DE INCIDENCIA', pageWidth / 2, 40, { align: 'center' });
+    doc.text('I.E.P. VALORES Y CIENCIAS', pageW / 2, 16, { align: 'center' });
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('REPORTE OFICIAL DE INCIDENCIA', pageW / 2, 27, { align: 'center' });
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`CÓDIGO: ${incident.correlative}`, pageW / 2, 38, { align: 'center' });
     doc.setTextColor(55, 65, 81);
-    doc.setFontSize(16);
-    doc.text(`CÓDIGO: ${incident.correlative}`, 20, 60);
-    const startY = 75;
-    const rowHeight = 10;
-    const categoryName = incident.incident_categories?.name || incident.other_category_suggestion || 'No especificada';
+    y = 52;
+
+    // ══════════════════════════════════════════════════════════════════════
+    // FICHA DE DATOS GENERALES
+    // ══════════════════════════════════════════════════════════════════════
+    const categoryName = incident.incident_categories?.name
+      || incident.other_category_suggestion
+      || 'No especificada';
+
     const location = incident.type === IncidentType.GENERAL
-      ? (incident.room_name || 'GENERAL')
+      ? (incident.room_name || 'Instalaciones Generales')
       : incident.classrooms
         ? `${incident.classrooms.level.toUpperCase()} - ${incident.classrooms.grade} "${incident.classrooms.section}"`
         : `${incident.level?.toUpperCase()} - ${incident.grade} "${incident.section}"`;
 
-    const details = [
-      ['FECHA/HORA:', new Date(incident.incident_date).toLocaleString()],
-      ['DOCENTE:', incident.profiles?.full_name || 'Desconocido'],
-      ['UBICACIÓN:', location.toUpperCase()],
-      ['CATEGORÍA:', categoryName.toUpperCase()],
-      ['ESTADO:', incident.status.toUpperCase()],
+    const details: [string, string][] = [
+      ['Fecha / Hora:', new Date(incident.incident_date).toLocaleString('es-PE')],
+      ['Docente:', incident.profiles?.full_name || 'No registrado'],
+      ['Tipo:', incident.type.toUpperCase()],
+      ['Ubicacion:', location],
+      ['Categoria:', categoryName],
+      ['Estado:', incident.status.toUpperCase()],
     ];
+
     if (incident.type === IncidentType.ESTUDIANTE) {
-      const participants = incident.incident_participants || [];
-      if (participants.length > 0) {
-        const studentsList = participants.map(p => `${p.students?.first_name} ${p.students?.last_name}`).join(', ');
-        details.push(['ESTUDIANTES:', studentsList]);
-      } else if (incident.involved_students) {
-        const studentsList = incident.involved_students.map(s => `${s.names} ${s.lastNames}`).join(', ');
-        details.push(['ESTUDIANTES:', studentsList]);
+      const parts = incident.incident_participants || [];
+      let names = '';
+      if (parts.length > 0) {
+        names = parts.map(p => `${p.students?.first_name || ''} ${p.students?.last_name || ''}`.trim()).filter(Boolean).join('; ');
+      } else if (incident.involved_students?.length) {
+        names = incident.involved_students.map(s => `${s.names} ${s.lastNames}`.trim()).join('; ');
       }
+      if (names) details.push(['Estudiantes:', names]);
     }
-    details.forEach((row, i) => {
+
+    const labelX = marginL;
+    const valueX = marginL + 38;
+    const valueW = contentW - 38;
+
+    details.forEach(([label, value]) => {
+      doc.setFontSize(10);
+      const valueLines: string[] = doc.splitTextToSize(value, valueW);
+      const blockH = valueLines.length * 6 + 2;
+      checkPage(blockH);
       doc.setFont('helvetica', 'bold');
-      doc.text(row[0], 20, startY + (i * rowHeight));
+      doc.text(label, labelX, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(row[1], 85, startY + (i * rowHeight));
+      valueLines.forEach((line: string, idx: number) => {
+        doc.text(line, valueX, y + idx * 6);
+      });
+      y += blockH;
     });
-    const descY = startY + (details.length * rowHeight) + 15;
+
+    // Separador
+    y += 4;
+    checkPage(6);
+    doc.setDrawColor(91, 201, 213);
+    doc.setLineWidth(0.5);
+    doc.line(marginL, y, pageW - marginR, y);
+    y += 7;
+
+    // ══════════════════════════════════════════════════════════════════════
+    // DESCRIPCIÓN DE LOS HECHOS
+    // ══════════════════════════════════════════════════════════════════════
+    checkPage(12);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('DESCRIPCIÓN:', 20, descY);
-    doc.setFont('helvetica', 'normal');
-    const splitDesc = doc.splitTextToSize(incident.description, pageWidth - 40);
-    doc.text(splitDesc, 20, descY + 10);
+    doc.setTextColor(91, 201, 213);
+    doc.text('DESCRIPCION DE LOS HECHOS', marginL, y);
+    doc.setTextColor(55, 65, 81);
+    y += 7;
 
+    printWrapped(incident.description, marginL, contentW, 11, 'normal', 7);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // HISTORIAL DE ACCIONES
+    // ══════════════════════════════════════════════════════════════════════
     if (incident.incident_logs && incident.incident_logs.length > 0) {
-      let currentY = descY + 10 + (splitDesc.length * 7) + 15;
-
-      doc.setFont('helvetica', 'bold');
+      y += 4;
+      checkPage(6);
       doc.setDrawColor(91, 201, 213);
-      doc.text('HISTORIAL DE ACCIONES / RESOLUCIÓN:', 20, currentY);
+      doc.setLineWidth(0.5);
+      doc.line(marginL, y, pageW - marginR, y);
+      y += 7;
 
-      incident.incident_logs
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // PDF chronologically
-        .forEach((log) => {
-          currentY += 10;
-          if (currentY > 270) { doc.addPage(); currentY = 20; }
+      checkPage(12);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(91, 201, 213);
+      doc.text('HISTORIAL DE ACCIONES / RESOLUCION', marginL, y);
+      doc.setTextColor(55, 65, 81);
+      y += 8;
 
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          const header = `[${log.status.toUpperCase()}] - ${new Date(log.created_at).toLocaleString()} - POR: ${log.profiles?.full_name || 'PERSONAL'}`;
-          doc.text(header, 20, currentY);
+      const sorted = [...incident.incident_logs].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
 
-          currentY += 5;
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(11);
-          const splitLog = doc.splitTextToSize(log.comment, pageWidth - 40);
-          doc.text(splitLog, 20, currentY);
-          currentY += (splitLog.length * 6) + 5;
-        });
+      sorted.forEach((log, idx) => {
+        // Cabecera del log
+        const logHeader = `[${log.status.toUpperCase()}]  ${new Date(log.created_at).toLocaleString('es-PE')}  -  Por: ${log.profiles?.full_name || 'Personal'}`;
+        const headerLines: string[] = doc.splitTextToSize(logHeader, contentW);
+        checkPage(headerLines.length * 5 + 2);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(100, 116, 139);
+        headerLines.forEach((line: string) => { doc.text(line, marginL, y); y += 5; });
+        doc.setTextColor(55, 65, 81);
+
+        // Cuerpo del log
+        printWrapped(log.comment, marginL + 3, contentW - 3, 10, 'normal', 6);
+
+        if (idx < sorted.length - 1) {
+          y += 2;
+          checkPage(4);
+          doc.setDrawColor(220, 220, 220);
+          doc.setLineWidth(0.3);
+          doc.line(marginL, y, pageW - marginR, y);
+          y += 4;
+        }
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // PIE DE PÁGINA en todas las páginas
+    // ══════════════════════════════════════════════════════════════════════
+    const totalPages: number = (doc.internal as any).getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(180, 180, 180);
+      doc.text(
+        `I.E.P. Valores y Ciencias - Generado: ${new Date().toLocaleString('es-PE')}`,
+        pageW / 2, pageH - 10, { align: 'center' }
+      );
+      doc.text(`Pag. ${p} / ${totalPages}`, pageW - marginR, pageH - 10, { align: 'right' });
     }
 
     doc.save(`incidencia-${incident.correlative}.pdf`);
