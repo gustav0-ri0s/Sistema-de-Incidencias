@@ -24,7 +24,8 @@ import {
   Image as ImageIcon,
   History,
   Trash2,
-  Edit3
+  Edit3,
+  Save
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -43,6 +44,9 @@ const IncidentList: React.FC = () => {
   const [isSendingPsych, setIsSendingPsych] = useState(false);
   const [psychSuggestionSent, setPsychSuggestionSent] = useState(false);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [isEditingIncident, setIsEditingIncident] = useState(false);
+  const [editIncidentForm, setEditIncidentForm] = useState({ description: '' });
+  const [isSavingIncident, setIsSavingIncident] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -57,6 +61,7 @@ const IncidentList: React.FC = () => {
   }, [statusFilter, user]);
 
   const isAdminOrSupervisor = user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN || user?.role === UserRole.PSICOLOGA;
+  const isDocente = user?.role === UserRole.DOCENTE || user?.role === UserRole.DOCENTE_INGLES;
 
   const fetchIncidents = async () => {
     setLoading(true);
@@ -340,6 +345,25 @@ const IncidentList: React.FC = () => {
     }
   };
 
+  const handleEditIncidentSave = async () => {
+    if (!selectedIncident || !editIncidentForm.description.trim()) return;
+    setIsSavingIncident(true);
+
+    const { error } = await supabase
+      .from('incidents')
+      .update({ description: editIncidentForm.description })
+      .eq('id', selectedIncident.id);
+
+    if (!error) {
+      setSelectedIncident(prev => prev ? { ...prev, description: editIncidentForm.description } : null);
+      setIncidents(prev => prev.map(i => i.id === selectedIncident.id ? { ...i, description: editIncidentForm.description } : i));
+      setIsEditingIncident(false);
+    } else {
+      alert('Error al guardar los cambios.');
+    }
+    setIsSavingIncident(false);
+  };
+
   const getStatusStyle = (status: IncidentStatus) => {
     switch (status) {
       case IncidentStatus.REGISTRADA: return 'bg-gray-100 text-gray-500 border-gray-200';
@@ -544,6 +568,20 @@ const IncidentList: React.FC = () => {
                         >
                           <Eye className="w-7 h-7" />
                         </button>
+                        {/* Botón editar para docente en su propia incidencia con estado REGISTRADA */}
+                        {isDocente && incident.teacher_id === user?.id && incident.status === IncidentStatus.REGISTRADA && (
+                          <button
+                            onClick={() => {
+                              setEditIncidentForm({ description: incident.description });
+                              setIsEditingIncident(true);
+                              handleOpenDetail(incident);
+                            }}
+                            className="p-3 text-amber-500 hover:bg-amber-50 rounded-2xl transition-all"
+                            title="Editar incidencia"
+                          >
+                            <Edit3 className="w-7 h-7" />
+                          </button>
+                        )}
                         {(user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERVISOR) && (
                           <button
                             onClick={() => openDeleteIncidentConfirm(incident.id)}
@@ -693,8 +731,8 @@ const IncidentList: React.FC = () => {
               {/* === PSYCH SUGGESTION PANEL - independent, always visible for supervisor/admin on student incidents === */}
               {(user?.role === UserRole.SUPERVISOR || user?.role === UserRole.ADMIN) && selectedIncident.type === IncidentType.ESTUDIANTE && (
                 <div className={`rounded-3xl border-2 p-5 transition-all ${psychSuggestionSent
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-violet-50 border-violet-200'
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-violet-50 border-violet-200'
                   }`}>
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-2xl shrink-0 ${psychSuggestionSent ? 'bg-green-100 text-green-600' : 'bg-violet-100 text-violet-600'
@@ -726,8 +764,8 @@ const IncidentList: React.FC = () => {
                                 onChange={(e) => setSuggestPsychAttention(e.target.checked)}
                               />
                               <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${suggestPsychAttention
-                                  ? 'bg-violet-600 border-violet-600'
-                                  : 'bg-white border-violet-300 group-hover:border-violet-500'
+                                ? 'bg-violet-600 border-violet-600'
+                                : 'bg-white border-violet-300 group-hover:border-violet-500'
                                 }`}>
                                 {suggestPsychAttention && (
                                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -746,8 +784,8 @@ const IncidentList: React.FC = () => {
                         onClick={handleSendPsychSuggestion}
                         disabled={!suggestPsychAttention || isSendingPsych}
                         className={`shrink-0 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${suggestPsychAttention && !isSendingPsych
-                            ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-600/30'
-                            : 'bg-violet-100 text-violet-300 cursor-not-allowed'
+                          ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-600/30'
+                          : 'bg-violet-100 text-violet-300 cursor-not-allowed'
                           }`}
                       >
                         {isSendingPsych ? (
@@ -839,9 +877,57 @@ const IncidentList: React.FC = () => {
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
                   <MessageSquare className="w-4 h-4 mr-2 text-brand-turquoise" /> Hechos Reportados
                 </label>
-                <div className="bg-white p-10 rounded-[2.5rem] border-2 border-brand-turquoise/20 text-gray-700 text-lg font-medium shadow-inner">
-                  {selectedIncident.description}
-                </div>
+
+                {/* Modo edición para docente */}
+                {isEditingIncident && isDocente && selectedIncident.teacher_id === user?.id && selectedIncident.status === IncidentStatus.REGISTRADA ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-2xl">
+                      <Edit3 className="w-4 h-4 text-amber-600 shrink-0" />
+                      <p className="text-xs font-bold text-amber-700">Modo edición activo — Solo puedes editar mientras la incidencia no haya sido revisada.</p>
+                    </div>
+                    <textarea
+                      rows={5}
+                      className="w-full bg-white border-2 border-brand-turquoise/30 rounded-[2.5rem] px-10 py-8 outline-none focus:border-brand-turquoise transition-all font-medium text-gray-700 text-lg shadow-inner"
+                      value={editIncidentForm.description}
+                      onChange={e => setEditIncidentForm({ description: e.target.value })}
+                      placeholder="Describa los hechos..."
+                    />
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={() => setIsEditingIncident(false)}
+                        className="px-6 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleEditIncidentSave}
+                        disabled={isSavingIncident || !editIncidentForm.description.trim()}
+                        className="px-8 py-2.5 bg-amber-500 text-white text-[10px] font-black uppercase rounded-xl shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        {isSavingIncident ? 'Guardando...' : 'Guardar Cambios'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="bg-white p-10 rounded-[2.5rem] border-2 border-brand-turquoise/20 text-gray-700 text-lg font-medium shadow-inner">
+                      {selectedIncident.description}
+                    </div>
+                    {/* Botón editar flotante para docente */}
+                    {isDocente && selectedIncident.teacher_id === user?.id && selectedIncident.status === IncidentStatus.REGISTRADA && (
+                      <button
+                        onClick={() => {
+                          setEditIncidentForm({ description: selectedIncident.description });
+                          setIsEditingIncident(true);
+                        }}
+                        className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-amber-100 transition-all"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedIncident.incident_logs && selectedIncident.incident_logs.length > 0 && (
